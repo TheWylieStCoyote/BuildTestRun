@@ -101,6 +101,26 @@ Build and test the project with:
 cargo test
 ```
 
+Install the CLI locally with:
+
+```bash
+./install.sh
+```
+
+Installer options:
+
+- `--root <dir>` to install into a custom Cargo root
+- `--debug` to install a debug build
+- `--force` to reinstall an existing binary
+- `--no-lock` to skip lockfile enforcement
+- `--check` to verify prerequisites only
+
+```bash
+./install.sh --root /tmp/mbr --debug --force
+./install.sh --check
+./install.sh --help
+```
+
 ## Documentation
 
 - `SPEC.md` describes the project in detail
