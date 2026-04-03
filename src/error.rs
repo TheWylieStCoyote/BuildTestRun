@@ -10,8 +10,14 @@ pub enum Error {
     #[error("no .mbr.toml found starting from {start}")]
     ConfigNotFound { start: PathBuf },
 
+    #[error("config already exists at {path}")]
+    ConfigExists { path: PathBuf },
+
     #[error("failed to read config {path}: {source}")]
     ConfigRead { path: PathBuf, source: io::Error },
+
+    #[error("failed to write config {path}: {source}")]
+    ConfigWrite { path: PathBuf, source: io::Error },
 
     #[error("failed to parse config {path}: {source}")]
     ConfigParse {
@@ -21,6 +27,12 @@ pub enum Error {
 
     #[error("missing `commands.{action}` in config")]
     MissingCommand { action: Action },
+
+    #[error("missing `[commands]` section in config")]
+    MissingCommandGroup,
+
+    #[error("unknown command `{name}`")]
+    UnknownCommand { name: String },
 
     #[error("invalid project root {path}")]
     InvalidProjectRoot { path: PathBuf },

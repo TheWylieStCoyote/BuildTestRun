@@ -20,9 +20,9 @@ fn build_runs_configured_command() {
         temp.path(),
         r#"
 [commands]
-build = "printf build-ok"
-test = "printf test-ok"
-run = "printf run-ok"
+build = { program = "sh", args = ["-c", "printf build-ok"] }
+test = { program = "sh", args = ["-c", "printf test-ok"] }
+run = { program = "sh", args = ["-c", "printf run-ok"] }
 "#,
     );
 
@@ -36,15 +36,78 @@ run = "printf run-ok"
 }
 
 #[test]
+fn build_forwards_extra_args() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = { program = "sh", args = ["-c", "printf '%s|%s' \"$1\" \"$2\"", "sh"] }
+"#,
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["build", "--", "--release", "--target"])
+        .assert()
+        .success()
+        .stdout(contains("--release|--target"));
+}
+
+#[test]
+fn executes_named_command() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+lint = { program = "sh", args = ["-c", "printf lint-ok"] }
+build = { program = "sh", args = ["-c", "printf build-ok"] }
+"#,
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["exec", "lint"])
+        .assert()
+        .success()
+        .stdout(contains("lint-ok"));
+}
+
+#[test]
+fn fmt_clean_and_ci_run_project_commands() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+fmt = { program = "sh", args = ["-c", "printf fmt-ok"] }
+clean = { program = "sh", args = ["-c", "printf clean-ok"] }
+ci = { program = "sh", args = ["-c", "printf ci-ok"] }
+"#,
+    );
+
+    for (cmd, expected) in [("fmt", "fmt-ok"), ("clean", "clean-ok"), ("ci", "ci-ok")] {
+        Command::cargo_bin("mbr")
+            .expect("binary")
+            .current_dir(temp.path())
+            .arg(cmd)
+            .assert()
+            .success()
+            .stdout(contains(expected));
+    }
+}
+
+#[test]
 fn discovers_config_from_subdirectory() {
     let temp = TempDir::new().expect("temp dir");
     write_config(
         temp.path(),
         r#"
 [commands]
-build = "printf build-ok"
-test = "printf test-ok"
-run = "printf run-ok"
+run = { program = "sh", args = ["-c", "printf run-ok"] }
 "#,
     );
     let nested = mkdir(temp.path(), "nested");
@@ -72,9 +135,9 @@ fn reports_missing_config() {
 }
 
 #[test]
-fn reports_invalid_toml() {
+fn reports_missing_command_group() {
     let temp = TempDir::new().expect("temp dir");
-    write_config(temp.path(), "[commands\nbuild = \"oops\"");
+    write_config(temp.path(), "[project]\nname = \"demo\"");
 
     Command::cargo_bin("mbr")
         .expect("binary")
@@ -82,5 +145,137 @@ fn reports_invalid_toml() {
         .arg("build")
         .assert()
         .failure()
-        .stderr(contains("failed to parse config"));
+        .stderr(contains("missing `[commands]` section"));
+}
+
+#[test]
+fn validate_succeeds_for_valid_config() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = { program = "sh", args = ["-c", "printf build-ok"] }
+"#,
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .arg("validate")
+        .assert()
+        .success()
+        .stderr(contains("config valid"));
+}
+
+#[test]
+fn init_writes_starter_config() {
+    let temp = TempDir::new().expect("temp dir");
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .arg("init")
+        .assert()
+        .success()
+        .stderr(contains("wrote"));
+
+    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    assert!(contents.contains("[commands]"));
+    assert!(contents.contains("program = \"cargo\""));
+}
+
+#[test]
+fn list_outputs_command_names() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = { program = "cargo", args = ["build"] }
+clean = { program = "cargo", args = ["clean"] }
+ci = { program = "cargo", args = ["test"] }
+fmt = { program = "cargo", args = ["fmt"] }
+lint = { program = "cargo", args = ["clippy"] }
+test = { program = "cargo", args = ["test"] }
+"#,
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .arg("list")
+        .assert()
+        .success()
+        .stdout(contains("build"))
+        .stdout(contains("clean"))
+        .stdout(contains("ci"))
+        .stdout(contains("fmt"))
+        .stdout(contains("lint"))
+        .stdout(contains("test"));
+}
+
+#[test]
+fn which_reports_config_and_root() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[project]
+root = "."
+
+[commands]
+build = { program = "cargo", args = ["build"] }
+"#,
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .arg("which")
+        .assert()
+        .success()
+        .stdout(contains("config:"))
+        .stdout(contains("root:"));
+}
+
+#[test]
+fn dry_run_prints_rendered_command() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = { program = "cargo", args = ["build"] }
+"#,
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["--dry-run", "build", "--", "--release"])
+        .assert()
+        .success()
+        .stdout(contains("cargo build --release"));
+}
+
+#[test]
+fn doctor_reports_config_status() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = { program = "cargo", args = ["build"] }
+"#,
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(contains("config:"))
+        .stdout(contains("warning:"));
 }

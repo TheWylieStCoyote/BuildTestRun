@@ -3,78 +3,72 @@
 ## Rust Project
 
 ```toml
-[project]
-name = "api-server"
-root = "."
-
 [commands]
-build = "cargo build"
-test = "cargo test"
-run = "cargo run"
+build = { program = "cargo", args = ["build"] }
+test = { program = "cargo", args = ["test"] }
+run = { program = "cargo", args = ["run"] }
+lint = { program = "cargo", args = ["clippy", "--all-targets", "--all-features", "--", "-D", "warnings"] }
 ```
 
 Usage:
 
 ```bash
-mbr build
-mbr test
-mbr run
+mbr build -- --release
+mbr test -- my_test_name
+mbr exec lint
+mbr validate
+mbr init
+mbr list
+mbr which
+mbr doctor
 ```
 
 ## Node Project
 
 ```toml
-[project]
-name = "frontend"
-
 [commands]
-build = "npm run build"
-test = "npm test"
-run = "npm start"
+build = { program = "npm", args = ["run", "build"] }
+test = { program = "npm", args = ["test"] }
+run = { program = "npm", args = ["start"] }
+fmt = { program = "npm", args = ["run", "format"] }
+clean = { program = "npm", args = ["run", "clean"] }
+ci = { program = "npm", args = ["run", "ci"] }
 ```
 
 ## Python Project
 
 ```toml
-[project]
-name = "worker"
-
 [env]
 PYTHONUNBUFFERED = "1"
 
 [commands]
-build = "python -m build"
-test = "pytest"
-run = "python main.py"
+build = { program = "python", args = ["-m", "build"] }
+test = { program = "pytest", args = [] }
+run = { program = "python", args = ["main.py"] }
+analyze = { program = "bandit", args = ["-r", "."] }
 ```
 
 ## Go Project With Custom Root
 
 ```toml
 [project]
-name = "go-service"
 root = "services/api"
 
 [commands]
-build = "go build ./..."
-test = "go test ./..."
-run = "go run ."
+build = { program = "go", args = ["build", "./..."] }
+test = { program = "go", args = ["test", "./..."] }
+run = { program = "go", args = ["run", "."] }
 ```
 
 ## CMake Project
 
 ```toml
-[project]
-name = "native-app"
-root = "."
-
 [commands]
-build = "cmake -S . -B build && cmake --build build"
-test = "ctest --test-dir build"
-run = "./build/native-app"
+build = { program = "cmake", args = ["-S", ".", "-B", "build"] }
+build_release = { program = "cmake", args = ["--build", "build", "--config", "Release"] }
+test = { program = "ctest", args = ["--test-dir", "build"] }
+run = { program = "./build/native-app", args = [] }
 ```
-
-If your executable name differs, update the `run` command to match the output binary.
 
 ## Common Pattern
 
@@ -84,4 +78,5 @@ Each project keeps a hidden `.mbr.toml` file at its root. The CLI discovers it a
 mbr build
 mbr test
 mbr run
+mbr exec ci
 ```
