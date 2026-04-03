@@ -520,7 +520,7 @@ fn load_file(path: &Path) -> Result<ProjectFile, Error> {
     })?;
     toml::from_str(&contents).map_err(|source| Error::ConfigParse {
         path: path.to_path_buf(),
-        source,
+        source: Box::new(source),
     })
 }
 

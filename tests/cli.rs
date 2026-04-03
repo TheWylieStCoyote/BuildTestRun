@@ -23,7 +23,7 @@ fn print_command_spec(output: &str) -> String {
 
 fn arg_pair_command_spec() -> String {
     if cfg!(windows) {
-        r#"{ program = "cmd", args = ["/C", "echo %1^|%2"] }"#.to_string()
+        r#"{ program = "powershell", args = ["-NoProfile", "-Command", "& { param($a, $b) Write-Output ($a + '|' + $b) }"] }"#.to_string()
     } else {
         r#"{ program = "sh", args = ["-c", "printf '%s|%s' \"$1\" \"$2\"", "sh"] }"#.to_string()
     }
@@ -31,7 +31,7 @@ fn arg_pair_command_spec() -> String {
 
 fn cwd_command_spec() -> String {
     if cfg!(windows) {
-        r#"program = "cmd", args = ["/C", "cd"]"#.to_string()
+        r#"program = "powershell", args = ["-NoProfile", "-Command", "Get-Location | Select-Object -ExpandProperty Path"]"#.to_string()
     } else {
         r#"program = "sh", args = ["-c", "pwd"]"#.to_string()
     }
@@ -39,7 +39,8 @@ fn cwd_command_spec() -> String {
 
 fn sleep_command_spec() -> String {
     if cfg!(windows) {
-        r#"program = "cmd", args = ["/C", "timeout /T 2 /NOBREAK >NUL"]"#.to_string()
+        r#"program = "powershell", args = ["-NoProfile", "-Command", "Start-Sleep -Seconds 2"]"#
+            .to_string()
     } else {
         r#"program = "sh", args = ["-c", "sleep 2"]"#.to_string()
     }
@@ -48,7 +49,7 @@ fn sleep_command_spec() -> String {
 fn sleep_and_print_command_spec(output: &str) -> String {
     if cfg!(windows) {
         format!(
-            r#"{{ program = "cmd", args = ["/C", "timeout /T 2 /NOBREAK >NUL && echo {output}"] }}"#
+            r#"{{ program = "powershell", args = ["-NoProfile", "-Command", "Start-Sleep -Seconds 2; Write-Output {output}"] }}"#
         )
     } else {
         format!(r#"{{ program = "sh", args = ["-c", "sleep 2; printf {output}"] }}"#)
@@ -57,7 +58,7 @@ fn sleep_and_print_command_spec(output: &str) -> String {
 
 fn env_values_command_spec() -> String {
     if cfg!(windows) {
-        r#"program = "cmd", args = ["/C", "echo %BASE%^|%KEEP%^|%CHILD%"]"#.to_string()
+        r#"program = "powershell", args = ["-NoProfile", "-Command", "Write-Output ($env:BASE + '|' + $env:KEEP + '|' + $env:CHILD)"]"#.to_string()
     } else {
         r#"program = "sh", args = ["-c", "printf '%s|%s|%s' \"$BASE\" \"$KEEP\" \"$CHILD\""]"#
             .to_string()
@@ -553,6 +554,12 @@ fn show_prints_resolved_command_details() {
 fn command_cwd_is_respected() {
     let temp = TempDir::new().expect("temp dir");
     let nested = mkdir(temp.path(), "nested");
+    let expected = temp
+        .path()
+        .file_name()
+        .and_then(|name| name.to_str())
+        .expect("temp dir name")
+        .to_string();
     write_config(
         temp.path(),
         &format!(
@@ -567,7 +574,7 @@ fn command_cwd_is_respected() {
         .arg("run")
         .assert()
         .success()
-        .stdout(contains("nested"));
+        .stdout(contains(expected));
 
     assert!(nested.exists());
 }
@@ -641,6 +648,12 @@ fn parallel_runs_commands_concurrently() {
 fn child_config_inherits_parent_commands() {
     let temp = TempDir::new().expect("temp dir");
     let nested = mkdir(temp.path(), "nested");
+    let expected_root = temp
+        .path()
+        .file_name()
+        .and_then(|name| name.to_str())
+        .expect("temp dir name")
+        .to_string();
     write_config(
         temp.path(),
         &format!(
@@ -660,7 +673,7 @@ fn child_config_inherits_parent_commands() {
         .arg("build")
         .assert()
         .success()
-        .stdout(contains(temp.path().to_string_lossy().as_ref()));
+        .stdout(contains(expected_root));
 
     Command::cargo_bin("mbr")
         .expect("binary")

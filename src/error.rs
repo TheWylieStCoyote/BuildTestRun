@@ -25,7 +25,7 @@ pub enum Error {
     #[error("failed to parse config {path}: {source}")]
     ConfigParse {
         path: PathBuf,
-        source: toml::de::Error,
+        source: Box<toml::de::Error>,
     },
 
     #[error("missing `commands.{action}` in config")]
