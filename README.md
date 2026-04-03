@@ -68,7 +68,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Generates a starter config with `mbr init --template <name>`
 - Supports interactive prompts with `mbr init --interactive`
 - Supports custom template files with `mbr init --template-file <path>`
-- Starter templates include rust, node, pnpm, yarn, python, poetry, uv, go, cargo-workspace, cmake, cmake-ninja, and generic
+- Starter templates include rust, node, pnpm, yarn, bun, deno, nextjs, vite, turbo, nx, python, django, fastapi, flask, poetry, hatch, pixi, uv, go, cargo-workspace, java-gradle, java-maven, kotlin-gradle, dotnet, php-composer, ruby-bundler, rails, laravel, terraform, helm, docker-compose, cmake, cmake-ninja, and generic
 - Lists commands and descriptions with `mbr list`
 - Shows resolved config with `mbr which`
 - Inspects a command with `mbr show <name>`

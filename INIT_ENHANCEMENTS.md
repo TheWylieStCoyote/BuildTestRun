@@ -1,55 +1,70 @@
-# Init Enhancements
+# Init Enhancements Checklist
 
-## Additional Templates
+## Implemented Templates
 
-- `bun`
-- `deno`
-- `nextjs`
-- `vite`
-- `turbo`
-- `nx`
-- `django`
-- `fastapi`
-- `flask`
-- `hatch`
-- `pixi`
-- `java-gradle`
-- `java-maven`
-- `kotlin-gradle`
-- `dotnet`
-- `php-composer`
-- `ruby-bundler`
-- `rails`
-- `laravel`
-- `terraform`
-- `helm`
-- `docker-compose`
+- [x] `rust` - Cargo build/test/run/fmt/clean/lint with a structured `ci` pipeline.
+- [x] `node` - npm scripts for build/test/run/dev/fmt/lint/typecheck/clean with pipeline `ci`.
+- [x] `pnpm` - pnpm script-based app template with build/test/run/dev/fmt/lint/typecheck/clean/ci.
+- [x] `yarn` - Yarn script-based app template with build/test/run/dev/fmt/lint/typecheck/clean/ci.
+- [x] `bun` - Bun-native scripts plus `bunx` for formatting and TypeScript checks.
+- [x] `deno` - Deno tasks plus `fmt`, `lint`, and `check` from Deno tooling.
+- [x] `nextjs` - Next.js defaults with build/test/run/dev/lint/typecheck/fmt/clean/ci.
+- [x] `vite` - Vite frontend defaults with preview-based run mode and JS checks.
+- [x] `turbo` - Turborepo workspace commands for build/test/dev/lint/typecheck/fmt/ci.
+- [x] `nx` - Nx monorepo commands with workspace-wide targets and cache reset cleanup.
+- [x] `python` - Plain Python packaging and test workflow with `ruff` and `mypy`-style checks.
+- [x] `django` - Django `manage.py`-centric template with test/run/check and ruff-based formatting.
+- [x] `fastapi` - ASGI template using `uvicorn`, `pytest`, `ruff`, and `mypy`.
+- [x] `flask` - Flask app template with `flask run --debug`, tests, and Python tooling.
+- [x] `poetry` - Poetry-managed project template with `poetry run` wrappers for checks and execution.
+- [x] `hatch` - Hatch-managed workflow with `hatch build`, `hatch test`, and tool-backed checks.
+- [x] `pixi` - Task-oriented Pixi template using `pixi run` for build/test/dev/lint/typecheck.
+- [x] `uv` - `uv`-driven Python workflow using `uv build` and `uv run` for tools.
+- [x] `go` - Go module defaults with `build`, `test`, `run`, `fmt`, `lint`, `check`, and `ci`.
+- [x] `cargo-workspace` - Cargo workspace template with workspace-wide build/test/lint/check/ci commands.
+- [x] `java-gradle` - Gradle wrapper commands with Windows/Unix overrides and build/test/run/check/ci.
+- [x] `java-maven` - Maven lifecycle commands with build/test/run/check/ci conventions.
+- [x] `kotlin-gradle` - Kotlin Gradle wrapper template aligned with Gradle-based JVM conventions.
+- [x] `dotnet` - .NET CLI workflow with build/test/run/dev/format/check/clean/ci.
+- [x] `php-composer` - Composer-centric template using composer scripts for build/test/run/lint/check/ci.
+- [x] `ruby-bundler` - Bundler/Rake/RSpec/RuboCop-based workflow for Ruby projects.
+- [x] `rails` - Rails app template with bin/rails defaults and RuboCop-based formatting/linting.
+- [x] `laravel` - Laravel template using artisan, Pint, and standard framework commands.
+- [x] `terraform` - Terraform-oriented template with fmt/validate/plan/apply-oriented commands.
+- [x] `helm` - Helm chart template with lint, package, template, and clean commands.
+- [x] `docker-compose` - Docker Compose template with build/up/down/clean and config validation.
+- [x] `cmake` - CMake configure/build/test/clean workflow with a placeholder executable target.
+- [x] `cmake-ninja` - CMake + Ninja variant with the same workflow and Ninja generator defaults.
+- [x] `generic` - Minimal placeholder template for manual customization.
 
-## Existing Template Improvements
+## Implemented Improvements
 
-- Replace shell-string CI entries with structured pipelines where possible
-- Add more commands like `lint`, `check`, `docs`, `dev`, and `typecheck`
-- Make `run` less placeholder-heavy in `cmake` and `cargo-workspace`
-- Prefer structured commands over inline shell for cleanup and CI tasks
-- Improve descriptions so `list --verbose` and `show` are more useful
-- Make Python templates reflect toolchain style more clearly
+- [x] Replace shell-string CI entries with structured pipelines where possible.
+- [x] Add more commands like `lint`, `check`, `dev`, and `typecheck` where they make sense.
+- [ ] Make `run` less placeholder-heavy in `cmake` and `cargo-workspace`.
+- [x] Prefer structured commands over inline shell for cleanup and CI tasks.
+- [x] Improve descriptions so `list --verbose` and `show` are more useful.
+- [x] Make Python templates reflect toolchain style more clearly.
 
-## Init UX
+## Implemented Init UX
 
-- Add `mbr init --interactive`
-- Prompt for project name
-- Prompt for template
-- Prompt for project root
-- Prompt for optional commands
-- Prompt for safe structured-only mode
+- [x] Add `mbr init --interactive`.
+- [x] Prompt for project name.
+- [x] Prompt for template.
+- [x] Prompt for project root.
+- [ ] Prompt for optional commands.
+- [ ] Prompt for safe structured-only mode.
 
-## Custom Templates
+## Implemented Custom Templates
 
-- Add support for `mbr init --template-file <path>`
-- Render placeholders before writing `.mbr.toml`
-- Validate rendered TOML before writing
+- [x] Add support for `mbr init --template-file <path>`.
+- [x] Render placeholders before writing `.mbr.toml`.
+- [ ] Validate rendered TOML before writing.
 
-## Open Decisions
+## Planned Follow-Up
 
-- Prompt implementation: standard stdin/stdout or a prompt crate
-- Custom template support: single file first or file plus directory support
+- [ ] Add more template-specific optional commands.
+- [ ] Improve `cmake` and `cargo-workspace` run commands.
+- [ ] Add interactive toggles for optional commands.
+- [ ] Add directory-based custom templates.
+- [ ] Add post-render validation for custom templates.

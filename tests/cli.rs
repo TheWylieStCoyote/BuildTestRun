@@ -318,11 +318,33 @@ fn init_uses_requested_template() {
 #[test]
 fn init_supports_extended_template_catalog() {
     let cases = [
+        ("bun", "program = \"bun\""),
+        ("deno", "program = \"deno\""),
+        ("nextjs", "program = \"npm\""),
+        ("vite", "program = \"npm\""),
+        ("turbo", "program = \"turbo\""),
+        ("nx", "program = \"nx\""),
         ("pnpm", "program = \"pnpm\""),
         ("yarn", "program = \"yarn\""),
+        ("django", "manage.py"),
+        ("fastapi", "uvicorn"),
+        ("flask", "flask"),
         ("poetry", "program = \"poetry\""),
+        ("hatch", "program = \"hatch\""),
+        ("pixi", "program = \"pixi\""),
         ("uv", "program = \"uv\""),
         ("cargo-workspace", "--workspace"),
+        ("java-gradle", "gradlew"),
+        ("java-maven", "mvn"),
+        ("kotlin-gradle", "gradlew"),
+        ("dotnet", "dotnet"),
+        ("php-composer", "composer"),
+        ("ruby-bundler", "bundle"),
+        ("rails", "bin"),
+        ("laravel", "artisan"),
+        ("terraform", "terraform"),
+        ("helm", "helm"),
+        ("docker-compose", "docker"),
         ("cmake-ninja", "-G"),
     ];
 

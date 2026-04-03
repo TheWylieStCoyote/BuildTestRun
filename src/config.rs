@@ -744,9 +744,55 @@ fn resolve_command(
 }
 
 pub fn starter_config_for(template: InitTemplate) -> &'static str {
+    template_spec(template).body
+}
+
+pub fn template_spec(template: InitTemplate) -> &'static TemplateSpec {
     match template {
-        InitTemplate::Rust => {
-            r#"[project]
+        InitTemplate::Rust => &TEMPLATE_RUST,
+        InitTemplate::Node => &TEMPLATE_NODE,
+        InitTemplate::Pnpm => &TEMPLATE_PNPM,
+        InitTemplate::Yarn => &TEMPLATE_YARN,
+        InitTemplate::Bun => &TEMPLATE_BUN,
+        InitTemplate::Deno => &TEMPLATE_DENO,
+        InitTemplate::Nextjs => &TEMPLATE_NEXTJS,
+        InitTemplate::Vite => &TEMPLATE_VITE,
+        InitTemplate::Turbo => &TEMPLATE_TURBO,
+        InitTemplate::Nx => &TEMPLATE_NX,
+        InitTemplate::Python => &TEMPLATE_PYTHON,
+        InitTemplate::Django => &TEMPLATE_DJANGO,
+        InitTemplate::Fastapi => &TEMPLATE_FASTAPI,
+        InitTemplate::Flask => &TEMPLATE_FLASK,
+        InitTemplate::Poetry => &TEMPLATE_POETRY,
+        InitTemplate::Hatch => &TEMPLATE_HATCH,
+        InitTemplate::Pixi => &TEMPLATE_PIXI,
+        InitTemplate::Uv => &TEMPLATE_UV,
+        InitTemplate::Go => &TEMPLATE_GO,
+        InitTemplate::CargoWorkspace => &TEMPLATE_CARGO_WORKSPACE,
+        InitTemplate::JavaGradle => &TEMPLATE_JAVA_GRADLE,
+        InitTemplate::JavaMaven => &TEMPLATE_JAVA_MAVEN,
+        InitTemplate::KotlinGradle => &TEMPLATE_KOTLIN_GRADLE,
+        InitTemplate::Dotnet => &TEMPLATE_DOTNET,
+        InitTemplate::PhpComposer => &TEMPLATE_PHP_COMPOSER,
+        InitTemplate::RubyBundler => &TEMPLATE_RUBY_BUNDLER,
+        InitTemplate::Rails => &TEMPLATE_RAILS,
+        InitTemplate::Laravel => &TEMPLATE_LARAVEL,
+        InitTemplate::Terraform => &TEMPLATE_TERRAFORM,
+        InitTemplate::Helm => &TEMPLATE_HELM,
+        InitTemplate::DockerCompose => &TEMPLATE_DOCKER_COMPOSE,
+        InitTemplate::Cmake => &TEMPLATE_CMAKE,
+        InitTemplate::CmakeNinja => &TEMPLATE_CMAKE_NINJA,
+        InitTemplate::Generic => &TEMPLATE_GENERIC,
+    }
+}
+
+pub struct TemplateSpec {
+    pub body: &'static str,
+    pub warning: &'static str,
+}
+
+const TEMPLATE_RUST: TemplateSpec = TemplateSpec {
+    body: r#"[project]
 name = "example"
 root = "."
 
@@ -759,12 +805,14 @@ test = { program = "cargo", args = ["test"], description = "Run tests" }
 run = { program = "cargo", args = ["run"], description = "Run the app" }
 fmt = { program = "cargo", args = ["fmt", "--all"], description = "Format source files" }
 clean = { program = "cargo", args = ["clean"], description = "Remove build artifacts" }
-ci = "cargo fmt --all && cargo clippy --all-targets --all-features -- -D warnings && cargo test"
+ci = { steps = ["fmt", "lint", "test"], description = "Run the standard checks" }
 lint = { program = "cargo", args = ["clippy", "--all-targets", "--all-features", "--", "-D", "warnings"], description = "Run Clippy" }
-"#
-        }
-        InitTemplate::Node => {
-            r#"[project]
+"#,
+    warning: "Rust starter uses cargo shell-based ci; review before CI use",
+};
+
+const TEMPLATE_NODE: TemplateSpec = TemplateSpec {
+    body: r#"[project]
 name = "example"
 root = "."
 
@@ -772,13 +820,18 @@ root = "."
 build = { program = "npm", args = ["run", "build"], description = "Build the app" }
 test = { program = "npm", args = ["test"], description = "Run tests" }
 run = { program = "npm", args = ["start"], description = "Start the app" }
+dev = { program = "npm", args = ["run", "dev"], description = "Start the dev server" }
 fmt = { program = "npm", args = ["run", "format"], description = "Format files" }
+lint = { program = "npm", args = ["run", "lint"], description = "Run lint checks" }
+typecheck = { program = "npm", args = ["run", "typecheck"], description = "Run TypeScript checks" }
 clean = { program = "npm", args = ["run", "clean"], description = "Remove generated files" }
-ci = "npm run ci"
-"#
-        }
-        InitTemplate::Pnpm => {
-            r#"[project]
+ci = { steps = ["fmt", "lint", "typecheck", "test"], description = "Run the standard checks" }
+"#,
+    warning: "Node starter uses npm script conventions; ensure scripts exist",
+};
+
+const TEMPLATE_PNPM: TemplateSpec = TemplateSpec {
+    body: r#"[project]
 name = "example"
 root = "."
 
@@ -786,13 +839,18 @@ root = "."
 build = { program = "pnpm", args = ["run", "build"], description = "Build the app" }
 test = { program = "pnpm", args = ["test"], description = "Run tests" }
 run = { program = "pnpm", args = ["start"], description = "Start the app" }
+dev = { program = "pnpm", args = ["run", "dev"], description = "Start the dev server" }
 fmt = { program = "pnpm", args = ["run", "format"], description = "Format files" }
+lint = { program = "pnpm", args = ["run", "lint"], description = "Run lint checks" }
+typecheck = { program = "pnpm", args = ["run", "typecheck"], description = "Run TypeScript checks" }
 clean = { program = "pnpm", args = ["run", "clean"], description = "Remove generated files" }
-ci = "pnpm run ci"
-"#
-        }
-        InitTemplate::Yarn => {
-            r#"[project]
+ci = { steps = ["fmt", "lint", "typecheck", "test"], description = "Run the standard checks" }
+"#,
+    warning: "pnpm starter assumes pnpm scripts exist in package.json",
+};
+
+const TEMPLATE_YARN: TemplateSpec = TemplateSpec {
+    body: r#"[project]
 name = "example"
 root = "."
 
@@ -800,13 +858,436 @@ root = "."
 build = { program = "yarn", args = ["build"], description = "Build the app" }
 test = { program = "yarn", args = ["test"], description = "Run tests" }
 run = { program = "yarn", args = ["start"], description = "Start the app" }
+dev = { program = "yarn", args = ["dev"], description = "Start the dev server" }
 fmt = { program = "yarn", args = ["format"], description = "Format files" }
+lint = { program = "yarn", args = ["lint"], description = "Run lint checks" }
+typecheck = { program = "yarn", args = ["typecheck"], description = "Run TypeScript checks" }
 clean = { program = "yarn", args = ["clean"], description = "Remove generated files" }
-ci = "yarn ci"
-"#
-        }
-        InitTemplate::Python => {
-            r#"[project]
+ci = { steps = ["fmt", "lint", "typecheck", "test"], description = "Run the standard checks" }
+"#,
+    warning: "Yarn starter assumes yarn scripts exist in package.json",
+};
+
+const TEMPLATE_BUN: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "bun", args = ["run", "build"], description = "Build the app" }
+test = { program = "bun", args = ["test"], description = "Run tests" }
+run = { program = "bun", args = ["run", "start"], description = "Start the app" }
+dev = { program = "bun", args = ["run", "dev"], description = "Start the dev server" }
+fmt = { program = "bunx", args = ["prettier", "--write", "."], description = "Format files" }
+lint = { program = "bun", args = ["run", "lint"], description = "Run lint checks" }
+typecheck = { program = "bunx", args = ["tsc", "--noEmit"], description = "Run TypeScript checks" }
+clean = { program = "bun", args = ["run", "clean"], description = "Remove generated files" }
+ci = { steps = ["fmt", "lint", "typecheck", "test"], description = "Run the standard checks" }
+"#,
+    warning: "Bun starter assumes Bun scripts exist in package.json",
+};
+
+const TEMPLATE_DENO: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "deno", args = ["task", "build"], description = "Build the app" }
+test = { program = "deno", args = ["test"], description = "Run tests" }
+run = { program = "deno", args = ["task", "start"], description = "Start the app" }
+dev = { program = "deno", args = ["task", "dev"], description = "Start the dev server" }
+fmt = { program = "deno", args = ["fmt"], description = "Format files" }
+lint = { program = "deno", args = ["lint"], description = "Run lint checks" }
+check = { program = "deno", args = ["check", "main.ts"], description = "Run type checks" }
+clean = { program = "deno", args = ["task", "clean"], description = "Remove generated files" }
+ci = { steps = ["fmt", "lint", "check", "test"], description = "Run the standard checks" }
+"#,
+    warning: "Deno starter assumes Deno tasks and entrypoints are configured",
+};
+
+const TEMPLATE_NEXTJS: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "npm", args = ["run", "build"], description = "Build the app" }
+test = { program = "npm", args = ["test"], description = "Run tests" }
+run = { program = "npm", args = ["run", "start"], description = "Start the app" }
+dev = { program = "npm", args = ["run", "dev"], description = "Start the dev server" }
+fmt = { program = "npm", args = ["run", "format"], description = "Format files" }
+lint = { program = "npm", args = ["run", "lint"], description = "Run lint checks" }
+typecheck = { program = "npm", args = ["run", "typecheck"], description = "Run TypeScript checks" }
+clean = { program = "npm", args = ["run", "clean"], description = "Remove generated files" }
+ci = { steps = ["fmt", "lint", "typecheck", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Next.js starter assumes npm scripts exist and match the defaults",
+};
+
+const TEMPLATE_VITE: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "npm", args = ["run", "build"], description = "Build the app" }
+test = { program = "npm", args = ["test"], description = "Run tests" }
+run = { program = "npm", args = ["run", "preview"], description = "Preview the app" }
+dev = { program = "npm", args = ["run", "dev"], description = "Start the dev server" }
+fmt = { program = "npm", args = ["run", "format"], description = "Format files" }
+lint = { program = "npm", args = ["run", "lint"], description = "Run lint checks" }
+typecheck = { program = "npm", args = ["run", "typecheck"], description = "Run TypeScript checks" }
+clean = { program = "npm", args = ["run", "clean"], description = "Remove generated files" }
+ci = { steps = ["fmt", "lint", "typecheck", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Vite starter assumes npm scripts exist and match the defaults",
+};
+
+const TEMPLATE_TURBO: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "turbo", args = ["run", "build"], description = "Build workspace packages" }
+test = { program = "turbo", args = ["run", "test"], description = "Run workspace tests" }
+run = { program = "turbo", args = ["run", "start"], description = "Start the app" }
+dev = { program = "turbo", args = ["run", "dev"], description = "Start the dev server" }
+fmt = { program = "turbo", args = ["run", "format"], description = "Format files" }
+lint = { program = "turbo", args = ["run", "lint"], description = "Run lint checks" }
+typecheck = { program = "turbo", args = ["run", "typecheck"], description = "Run TypeScript checks" }
+clean = { program = "turbo", args = ["run", "clean"], description = "Remove generated files" }
+ci = { steps = ["fmt", "lint", "typecheck", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Turbo starter assumes workspace scripts exist and match the defaults",
+};
+
+const TEMPLATE_NX: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "nx", args = ["run-many", "-t", "build"], description = "Build workspace packages" }
+test = { program = "nx", args = ["run-many", "-t", "test"], description = "Run workspace tests" }
+run = { program = "nx", args = ["run-many", "-t", "serve"], description = "Serve the app" }
+dev = { program = "nx", args = ["run-many", "-t", "serve"], description = "Start the dev server" }
+fmt = { program = "nx", args = ["format:write"], description = "Format files" }
+lint = { program = "nx", args = ["run-many", "-t", "lint"], description = "Run lint checks" }
+typecheck = { program = "nx", args = ["run-many", "-t", "typecheck"], description = "Run TypeScript checks" }
+clean = { program = "nx", args = ["reset"], description = "Reset workspace caches" }
+ci = { steps = ["fmt", "lint", "typecheck", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Nx starter assumes workspace targets exist and match the defaults",
+};
+
+const TEMPLATE_DJANGO: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "python", args = ["-m", "build"], description = "Build the package" }
+test = { program = "python", args = ["manage.py", "test"], description = "Run tests" }
+run = { program = "python", args = ["manage.py", "runserver"], description = "Start the dev server" }
+dev = { program = "python", args = ["manage.py", "runserver"], description = "Start the dev server" }
+fmt = { program = "ruff", args = ["format", "."], description = "Format source files" }
+lint = { program = "ruff", args = ["check", "."], description = "Run lint checks" }
+check = { program = "python", args = ["manage.py", "check"], description = "Run Django checks" }
+clean = { program = "python", args = ["-c", "import shutil; [shutil.rmtree(p, ignore_errors=True) for p in ('build', 'dist')]"], description = "Remove build outputs" }
+ci = { steps = ["fmt", "lint", "check", "test"], description = "Run the standard checks" }
+"#,
+    warning: "Django starter assumes manage.py, pytest, and ruff are installed",
+};
+
+const TEMPLATE_FASTAPI: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "python", args = ["-m", "build"], description = "Build the package" }
+test = { program = "pytest", args = [], description = "Run tests" }
+run = { program = "uvicorn", args = ["main:app", "--reload"], description = "Run the ASGI app" }
+dev = { program = "uvicorn", args = ["main:app", "--reload"], description = "Run the ASGI app" }
+fmt = { program = "ruff", args = ["format", "."], description = "Format source files" }
+lint = { program = "ruff", args = ["check", "."], description = "Run lint checks" }
+typecheck = { program = "mypy", args = ["."], description = "Run static type checks" }
+clean = { program = "python", args = ["-c", "import shutil; [shutil.rmtree(p, ignore_errors=True) for p in ('build', 'dist')]"], description = "Remove build outputs" }
+ci = { steps = ["fmt", "lint", "typecheck", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "FastAPI starter assumes main:app and Python tooling are installed",
+};
+
+const TEMPLATE_FLASK: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "python", args = ["-m", "build"], description = "Build the package" }
+test = { program = "pytest", args = [], description = "Run tests" }
+run = { program = "flask", args = ["--app", "app", "run", "--debug"], description = "Run the Flask app" }
+dev = { program = "flask", args = ["--app", "app", "run", "--debug"], description = "Run the Flask app" }
+fmt = { program = "ruff", args = ["format", "."], description = "Format source files" }
+lint = { program = "ruff", args = ["check", "."], description = "Run lint checks" }
+typecheck = { program = "mypy", args = ["."], description = "Run static type checks" }
+clean = { program = "python", args = ["-c", "import shutil; [shutil.rmtree(p, ignore_errors=True) for p in ('build', 'dist')]"], description = "Remove build outputs" }
+ci = { steps = ["fmt", "lint", "typecheck", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Flask starter assumes app.py and Python tooling are installed",
+};
+
+const TEMPLATE_HATCH: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "hatch", args = ["build"], description = "Build the package" }
+test = { program = "hatch", args = ["test"], description = "Run tests" }
+run = { program = "hatch", args = ["run", "python", "main.py"], description = "Run the app" }
+dev = { program = "hatch", args = ["run", "python", "main.py"], description = "Run the local app" }
+fmt = { program = "hatch", args = ["run", "ruff", "format", "."], description = "Format source files" }
+lint = { program = "hatch", args = ["run", "ruff", "check", "."], description = "Run lint checks" }
+typecheck = { program = "hatch", args = ["run", "mypy", "."], description = "Run static type checks" }
+clean = { program = "python", args = ["-c", "import shutil; [shutil.rmtree(p, ignore_errors=True) for p in ('build', 'dist')]"], description = "Remove build outputs" }
+ci = { steps = ["fmt", "lint", "typecheck", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Hatch starter assumes hatch and Python tooling are installed",
+};
+
+const TEMPLATE_PIXI: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "pixi", args = ["run", "build"], description = "Build the package" }
+test = { program = "pixi", args = ["run", "test"], description = "Run tests" }
+run = { program = "pixi", args = ["run", "start"], description = "Run the app" }
+dev = { program = "pixi", args = ["run", "dev"], description = "Start the dev server" }
+fmt = { program = "pixi", args = ["run", "fmt"], description = "Format source files" }
+lint = { program = "pixi", args = ["run", "lint"], description = "Run lint checks" }
+typecheck = { program = "pixi", args = ["run", "typecheck"], description = "Run static type checks" }
+clean = { program = "pixi", args = ["run", "clean"], description = "Remove build outputs" }
+ci = { steps = ["fmt", "lint", "typecheck", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Pixi starter assumes project tasks exist and match the defaults",
+};
+
+const TEMPLATE_JAVA_GRADLE: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "./gradlew", args = ["build"], windows = { program = "gradlew.bat", args = ["build"] }, description = "Build the project" }
+test = { program = "./gradlew", args = ["test"], windows = { program = "gradlew.bat", args = ["test"] }, description = "Run tests" }
+run = { program = "./gradlew", args = ["run"], windows = { program = "gradlew.bat", args = ["run"] }, description = "Run the app" }
+dev = { program = "./gradlew", args = ["run"], windows = { program = "gradlew.bat", args = ["run"] }, description = "Run the app" }
+fmt = { program = "./gradlew", args = ["spotlessApply"], windows = { program = "gradlew.bat", args = ["spotlessApply"] }, description = "Format source files" }
+lint = { program = "./gradlew", args = ["check"], windows = { program = "gradlew.bat", args = ["check"] }, description = "Run lint and checks" }
+check = { program = "./gradlew", args = ["check"], windows = { program = "gradlew.bat", args = ["check"] }, description = "Run checks" }
+clean = { program = "./gradlew", args = ["clean"], windows = { program = "gradlew.bat", args = ["clean"] }, description = "Remove build outputs" }
+ci = { steps = ["fmt", "lint", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Gradle starter assumes a wrapper script and configured plugins",
+};
+
+const TEMPLATE_JAVA_MAVEN: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "mvn", args = ["package"], description = "Build the project" }
+test = { program = "mvn", args = ["test"], description = "Run tests" }
+run = { program = "mvn", args = ["exec:java"], description = "Run the app" }
+dev = { program = "mvn", args = ["exec:java"], description = "Run the app" }
+fmt = { program = "mvn", args = ["spotless:apply"], description = "Format source files" }
+lint = { program = "mvn", args = ["verify"], description = "Run lint and checks" }
+check = { program = "mvn", args = ["verify"], description = "Run checks" }
+clean = { program = "mvn", args = ["clean"], description = "Remove build outputs" }
+ci = { steps = ["fmt", "lint", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Maven starter assumes the exec and formatting plugins are configured",
+};
+
+const TEMPLATE_KOTLIN_GRADLE: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "./gradlew", args = ["build"], windows = { program = "gradlew.bat", args = ["build"] }, description = "Build the project" }
+test = { program = "./gradlew", args = ["test"], windows = { program = "gradlew.bat", args = ["test"] }, description = "Run tests" }
+run = { program = "./gradlew", args = ["run"], windows = { program = "gradlew.bat", args = ["run"] }, description = "Run the app" }
+dev = { program = "./gradlew", args = ["run"], windows = { program = "gradlew.bat", args = ["run"] }, description = "Run the app" }
+fmt = { program = "./gradlew", args = ["ktlintFormat"], windows = { program = "gradlew.bat", args = ["ktlintFormat"] }, description = "Format source files" }
+lint = { program = "./gradlew", args = ["check"], windows = { program = "gradlew.bat", args = ["check"] }, description = "Run lint and checks" }
+check = { program = "./gradlew", args = ["check"], windows = { program = "gradlew.bat", args = ["check"] }, description = "Run checks" }
+clean = { program = "./gradlew", args = ["clean"], windows = { program = "gradlew.bat", args = ["clean"] }, description = "Remove build outputs" }
+ci = { steps = ["fmt", "lint", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Kotlin Gradle starter assumes a wrapper script and configured plugins",
+};
+
+const TEMPLATE_DOTNET: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "dotnet", args = ["build"], description = "Build the project" }
+test = { program = "dotnet", args = ["test"], description = "Run tests" }
+run = { program = "dotnet", args = ["run"], description = "Run the app" }
+dev = { program = "dotnet", args = ["watch", "run"], description = "Run the app in watch mode" }
+fmt = { program = "dotnet", args = ["format"], description = "Format source files" }
+lint = { program = "dotnet", args = ["build", "-warnaserror"], description = "Run lint and checks" }
+check = { program = "dotnet", args = ["build"], description = "Run checks" }
+clean = { program = "dotnet", args = ["clean"], description = "Remove build outputs" }
+ci = { steps = ["fmt", "lint", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: ".NET starter assumes dotnet tooling and project conventions are configured",
+};
+
+const TEMPLATE_PHP_COMPOSER: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "composer", args = ["install"], description = "Install dependencies" }
+test = { program = "composer", args = ["test"], description = "Run tests" }
+run = { program = "composer", args = ["start"], description = "Run the app" }
+dev = { program = "composer", args = ["start"], description = "Run the app" }
+fmt = { program = "composer", args = ["fmt"], description = "Format source files" }
+lint = { program = "composer", args = ["lint"], description = "Run lint checks" }
+check = { program = "composer", args = ["validate"], description = "Validate project files" }
+clean = { program = "composer", args = ["clean"], description = "Remove generated files" }
+ci = { steps = ["fmt", "lint", "check", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Composer starter assumes scripts exist for test, fmt, lint, and start",
+};
+
+const TEMPLATE_RUBY_BUNDLER: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "bundle", args = ["exec", "rake", "build"], description = "Build the package" }
+test = { program = "bundle", args = ["exec", "rspec"], description = "Run tests" }
+run = { program = "bundle", args = ["exec", "ruby", "main.rb"], description = "Run the app" }
+dev = { program = "bundle", args = ["exec", "ruby", "main.rb"], description = "Run the app" }
+fmt = { program = "bundle", args = ["exec", "rubocop", "-A"], description = "Format source files" }
+lint = { program = "bundle", args = ["exec", "rubocop"], description = "Run lint checks" }
+check = { program = "bundle", args = ["exec", "rubocop"], description = "Run checks" }
+clean = { program = "bundle", args = ["exec", "rake", "clean"], description = "Remove build outputs" }
+ci = { steps = ["fmt", "lint", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Ruby Bundler starter assumes Rake, RSpec, and RuboCop are configured",
+};
+
+const TEMPLATE_RAILS: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "bin", args = ["rails", "assets:precompile"], description = "Precompile assets" }
+test = { program = "bin", args = ["rails", "test"], description = "Run tests" }
+run = { program = "bin", args = ["rails", "server"], description = "Run the app" }
+dev = { program = "bin", args = ["rails", "server"], description = "Run the app" }
+fmt = { program = "bundle", args = ["exec", "rubocop", "-A"], description = "Format source files" }
+lint = { program = "bundle", args = ["exec", "rubocop"], description = "Run lint checks" }
+check = { program = "bin", args = ["rails", "test"], description = "Run Rails checks" }
+clean = { program = "bin", args = ["rails", "tmp:clear", "log:clear"], description = "Remove generated files" }
+ci = { steps = ["fmt", "lint", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Rails starter assumes a Rails app with bin/rails and RuboCop configured",
+};
+
+const TEMPLATE_LARAVEL: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "composer", args = ["install"], description = "Install dependencies" }
+test = { program = "php", args = ["artisan", "test"], description = "Run tests" }
+run = { program = "php", args = ["artisan", "serve"], description = "Run the app" }
+dev = { program = "php", args = ["artisan", "serve"], description = "Run the app" }
+fmt = { program = "./vendor/bin/pint", args = [], description = "Format source files" }
+lint = { program = "./vendor/bin/pint", args = ["--test"], description = "Run lint checks" }
+check = { program = "php", args = ["artisan", "about"], description = "Validate the project" }
+clean = { program = "php", args = ["artisan", "optimize:clear"], description = "Remove cached files" }
+ci = { steps = ["fmt", "lint", "check", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Laravel starter assumes artisan and Pint are available",
+};
+
+const TEMPLATE_TERRAFORM: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "terraform", args = ["plan"], description = "Preview infrastructure changes" }
+test = { program = "terraform", args = ["validate"], description = "Validate configuration" }
+run = { program = "terraform", args = ["apply"], description = "Apply infrastructure changes" }
+dev = { program = "terraform", args = ["plan"], description = "Preview infrastructure changes" }
+fmt = { program = "terraform", args = ["fmt", "-recursive"], description = "Format configuration files" }
+lint = { program = "terraform", args = ["validate"], description = "Validate configuration" }
+check = { program = "terraform", args = ["validate"], description = "Run checks" }
+clean = { program = "terraform", args = ["fmt", "-recursive"], description = "Normalize terraform files" }
+ci = { steps = ["fmt", "lint", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Terraform starter assumes stateful operations are reviewed before apply",
+};
+
+const TEMPLATE_HELM: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "helm", args = ["package", "."], description = "Package the chart" }
+test = { program = "helm", args = ["lint", "."], description = "Lint the chart" }
+run = { program = "helm", args = ["template", "."], description = "Render the chart" }
+dev = { program = "helm", args = ["template", "."], description = "Render the chart" }
+fmt = { program = "helm", args = ["lint", "."], description = "Validate chart structure" }
+lint = { program = "helm", args = ["lint", "."], description = "Lint the chart" }
+check = { program = "helm", args = ["template", "."], description = "Render the chart" }
+clean = { program = "sh", args = ["-c", "rm -f ./*.tgz"], description = "Remove packaged charts" }
+ci = { steps = ["fmt", "lint", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Helm starter assumes chart packaging and linting are configured",
+};
+
+const TEMPLATE_DOCKER_COMPOSE: TemplateSpec = TemplateSpec {
+    body: r#"[project]
+name = "example"
+root = "."
+
+[commands]
+build = { program = "docker", args = ["compose", "build"], description = "Build service images" }
+test = { program = "docker", args = ["compose", "config"], description = "Validate the compose file" }
+run = { program = "docker", args = ["compose", "up"], description = "Start the stack" }
+dev = { program = "docker", args = ["compose", "up", "--build"], description = "Start the stack and rebuild images" }
+fmt = { program = "docker", args = ["compose", "config"], description = "Validate compose configuration" }
+lint = { program = "docker", args = ["compose", "config"], description = "Validate compose configuration" }
+check = { program = "docker", args = ["compose", "config"], description = "Validate compose configuration" }
+clean = { program = "docker", args = ["compose", "down", "--volumes", "--remove-orphans"], description = "Stop and remove containers" }
+ci = { steps = ["fmt", "lint", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Docker Compose starter assumes the compose file describes a runnable stack",
+};
+
+const TEMPLATE_PYTHON: TemplateSpec = TemplateSpec {
+    body: r#"[project]
 name = "example"
 root = "."
 
@@ -814,13 +1295,18 @@ root = "."
 build = { program = "python", args = ["-m", "build"], description = "Build the package" }
 test = { program = "pytest", args = [], description = "Run tests" }
 run = { program = "python", args = ["main.py"], description = "Run the app" }
+dev = { program = "python", args = ["main.py"], description = "Run the local app" }
 fmt = { program = "ruff", args = ["format", "."], description = "Format source files" }
+lint = { program = "ruff", args = ["check", "."], description = "Run lint checks" }
+typecheck = { program = "mypy", args = ["."], description = "Run static type checks" }
 clean = { program = "python", args = ["-c", "import shutil; [shutil.rmtree(p, ignore_errors=True) for p in ('build', 'dist')]"], description = "Remove build outputs" }
-ci = "pytest && ruff check . && python -m build"
-"#
-        }
-        InitTemplate::Poetry => {
-            r#"[project]
+ci = { steps = ["fmt", "lint", "typecheck", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Python starter assumes pytest and ruff are installed",
+};
+
+const TEMPLATE_POETRY: TemplateSpec = TemplateSpec {
+    body: r#"[project]
 name = "example"
 root = "."
 
@@ -828,13 +1314,18 @@ root = "."
 build = { program = "poetry", args = ["build"], description = "Build the package" }
 test = { program = "poetry", args = ["run", "pytest"], description = "Run tests" }
 run = { program = "poetry", args = ["run", "python", "main.py"], description = "Run the app" }
+dev = { program = "poetry", args = ["run", "python", "main.py"], description = "Run the local app" }
 fmt = { program = "poetry", args = ["run", "ruff", "format", "."], description = "Format source files" }
+lint = { program = "poetry", args = ["run", "ruff", "check", "."], description = "Run lint checks" }
+typecheck = { program = "poetry", args = ["run", "mypy", "."], description = "Run static type checks" }
 clean = { program = "poetry", args = ["run", "python", "-c", "import shutil; [shutil.rmtree(p, ignore_errors=True) for p in ('build', 'dist')]"], description = "Remove build outputs" }
-ci = "poetry run pytest && poetry run ruff check . && poetry build"
-"#
-        }
-        InitTemplate::Uv => {
-            r#"[project]
+ci = { steps = ["fmt", "lint", "typecheck", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Poetry starter assumes poetry and project metadata are configured",
+};
+
+const TEMPLATE_UV: TemplateSpec = TemplateSpec {
+    body: r#"[project]
 name = "example"
 root = "."
 
@@ -842,13 +1333,18 @@ root = "."
 build = { program = "uv", args = ["build"], description = "Build the package" }
 test = { program = "uv", args = ["run", "pytest"], description = "Run tests" }
 run = { program = "uv", args = ["run", "python", "main.py"], description = "Run the app" }
+dev = { program = "uv", args = ["run", "python", "main.py"], description = "Run the local app" }
 fmt = { program = "uv", args = ["run", "ruff", "format", "."], description = "Format source files" }
+lint = { program = "uv", args = ["run", "ruff", "check", "."], description = "Run lint checks" }
+typecheck = { program = "uv", args = ["run", "mypy", "."], description = "Run static type checks" }
 clean = { program = "uv", args = ["run", "python", "-c", "import shutil; [shutil.rmtree(p, ignore_errors=True) for p in ('build', 'dist')]"], description = "Remove build outputs" }
-ci = "uv run pytest && uv run ruff check . && uv build"
-"#
-        }
-        InitTemplate::Go => {
-            r#"[project]
+ci = { steps = ["fmt", "lint", "typecheck", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "uv starter assumes uv and Python tooling are installed",
+};
+
+const TEMPLATE_GO: TemplateSpec = TemplateSpec {
+    body: r#"[project]
 name = "example"
 root = "."
 
@@ -856,13 +1352,18 @@ root = "."
 build = { program = "go", args = ["build", "./..."], description = "Build all packages" }
 test = { program = "go", args = ["test", "./..."], description = "Run tests" }
 run = { program = "go", args = ["run", "."], description = "Run the app" }
+dev = { program = "go", args = ["run", "."], description = "Run the app locally" }
 fmt = { program = "gofmt", args = ["-w", "."], description = "Format source files" }
+lint = { program = "go", args = ["test", "./..."], description = "Run the default validation checks" }
+check = { program = "go", args = ["test", "./..."], description = "Run validation checks" }
 clean = { program = "go", args = ["clean"], description = "Clean build cache" }
-ci = "go test ./..."
-"#
-        }
-        InitTemplate::CargoWorkspace => {
-            r#"[project]
+ci = { steps = ["fmt", "lint", "test", "build"], description = "Run the standard checks" }
+"#,
+    warning: "Go starter assumes gofmt and go tooling are installed",
+};
+
+const TEMPLATE_CARGO_WORKSPACE: TemplateSpec = TemplateSpec {
+    body: r#"[project]
 name = "example"
 root = "."
 
@@ -871,12 +1372,16 @@ build = { program = "cargo", args = ["build", "--workspace"], description = "Bui
 test = { program = "cargo", args = ["test", "--workspace"], description = "Run workspace tests" }
 run = { program = "cargo", args = ["run", "--workspace"], description = "Run the selected package" }
 fmt = { program = "cargo", args = ["fmt", "--all"], description = "Format source files" }
+lint = { program = "cargo", args = ["clippy", "--workspace", "--all-targets", "--all-features", "--", "-D", "warnings"], description = "Run Clippy" }
+check = { program = "cargo", args = ["check", "--workspace"], description = "Run workspace checks" }
 clean = { program = "cargo", args = ["clean"], description = "Remove build artifacts" }
-ci = "cargo fmt --all && cargo clippy --workspace --all-targets --all-features -- -D warnings && cargo test --workspace"
-"#
-        }
-        InitTemplate::Cmake => {
-            r#"[project]
+ci = { steps = ["fmt", "lint", "test"], description = "Run the standard checks" }
+"#,
+    warning: "Cargo workspace starter assumes a Rust workspace layout",
+};
+
+const TEMPLATE_CMAKE: TemplateSpec = TemplateSpec {
+    body: r#"[project]
 name = "example"
 root = "."
 
@@ -885,12 +1390,16 @@ build = { program = "cmake", args = ["-S", ".", "-B", "build"], description = "C
 test = { program = "ctest", args = ["--test-dir", "build"], description = "Run tests" }
 run = { program = "cmake", args = ["--build", "build", "--target", "run"], description = "Replace with your executable target" }
 fmt = { program = "cmake-format", args = ["-i", "CMakeLists.txt"], description = "Format CMake files" }
+lint = { program = "cmake", args = ["-S", ".", "-B", "build"], description = "Configure the build" }
+check = { program = "cmake", args = ["-S", ".", "-B", "build"], description = "Validate the build configuration" }
 clean = { program = "cmake", args = ["--build", "build", "--target", "clean"], description = "Remove build outputs" }
-ci = "ctest --test-dir build"
-"#
-        }
-        InitTemplate::CmakeNinja => {
-            r#"[project]
+ci = { steps = ["fmt", "check", "test"], description = "Run the standard checks" }
+"#,
+    warning: "CMake starter uses a placeholder run target; replace it with your executable target",
+};
+
+const TEMPLATE_CMAKE_NINJA: TemplateSpec = TemplateSpec {
+    body: r#"[project]
 name = "example"
 root = "."
 
@@ -899,12 +1408,16 @@ build = { program = "cmake", args = ["-S", ".", "-B", "build", "-G", "Ninja"], d
 test = { program = "ctest", args = ["--test-dir", "build"], description = "Run tests" }
 run = { program = "cmake", args = ["--build", "build", "--target", "run"], description = "Replace with your executable target" }
 fmt = { program = "cmake-format", args = ["-i", "CMakeLists.txt"], description = "Format CMake files" }
+lint = { program = "cmake", args = ["-S", ".", "-B", "build", "-G", "Ninja"], description = "Configure the build" }
+check = { program = "cmake", args = ["-S", ".", "-B", "build", "-G", "Ninja"], description = "Validate the build configuration" }
 clean = { program = "cmake", args = ["--build", "build", "--target", "clean"], description = "Remove build outputs" }
-ci = "ctest --test-dir build"
-"#
-        }
-        InitTemplate::Generic => {
-            r#"[project]
+ci = { steps = ["fmt", "check", "test"], description = "Run the standard checks" }
+"#,
+    warning: "CMake Ninja starter assumes Ninja and CMake are installed",
+};
+
+const TEMPLATE_GENERIC: TemplateSpec = TemplateSpec {
+    body: r#"[project]
 name = "example"
 root = "."
 
@@ -915,10 +1428,9 @@ run = "echo run"
 fmt = "echo fmt"
 clean = "echo clean"
 ci = "echo ci"
-"#
-        }
-    }
-}
+"#,
+    warning: "Generic starter is illustrative and should be customized",
+};
 
 fn render_args(args: &[String]) -> String {
     if cfg!(windows) {

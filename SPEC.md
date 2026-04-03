@@ -43,7 +43,7 @@ When a user runs `mbr build`, `mbr test`, `mbr run`, or `mbr exec <name>`, the C
 `mbr validate` should parse and validate the config without executing anything.
 `mbr validate --strict` should fail on missing conventional commands.
 `mbr init` should create a starter `.mbr.toml` in the current directory, with templates for common ecosystems.
-Template variants should include rust, node, pnpm, yarn, python, poetry, uv, go, cargo-workspace, cmake, cmake-ninja, and generic.
+Template variants should include rust, node, pnpm, yarn, bun, deno, nextjs, vite, turbo, nx, python, django, fastapi, flask, poetry, hatch, pixi, uv, go, cargo-workspace, java-gradle, java-maven, kotlin-gradle, dotnet, php-composer, ruby-bundler, rails, laravel, terraform, helm, docker-compose, cmake, cmake-ninja, and generic.
 `mbr init --interactive` should prompt for project name, root, and template.
 `mbr init --template-file <path>` should render a custom starter template from a file.
 `mbr list` should print available command names and optional descriptions.

@@ -257,11 +257,33 @@ fn prompt_template(default_template: cli::InitTemplate) -> Result<cli::InitTempl
         cli::InitTemplate::Node,
         cli::InitTemplate::Pnpm,
         cli::InitTemplate::Yarn,
+        cli::InitTemplate::Bun,
+        cli::InitTemplate::Deno,
+        cli::InitTemplate::Nextjs,
+        cli::InitTemplate::Vite,
+        cli::InitTemplate::Turbo,
+        cli::InitTemplate::Nx,
         cli::InitTemplate::Python,
+        cli::InitTemplate::Django,
+        cli::InitTemplate::Fastapi,
+        cli::InitTemplate::Flask,
         cli::InitTemplate::Poetry,
+        cli::InitTemplate::Hatch,
+        cli::InitTemplate::Pixi,
         cli::InitTemplate::Uv,
         cli::InitTemplate::Go,
         cli::InitTemplate::CargoWorkspace,
+        cli::InitTemplate::JavaGradle,
+        cli::InitTemplate::JavaMaven,
+        cli::InitTemplate::KotlinGradle,
+        cli::InitTemplate::Dotnet,
+        cli::InitTemplate::PhpComposer,
+        cli::InitTemplate::RubyBundler,
+        cli::InitTemplate::Rails,
+        cli::InitTemplate::Laravel,
+        cli::InitTemplate::Terraform,
+        cli::InitTemplate::Helm,
+        cli::InitTemplate::DockerCompose,
         cli::InitTemplate::Cmake,
         cli::InitTemplate::CmakeNinja,
         cli::InitTemplate::Generic,
@@ -269,7 +291,7 @@ fn prompt_template(default_template: cli::InitTemplate) -> Result<cli::InitTempl
 
     println!("Choose a template:");
     for (idx, item) in templates.iter().enumerate() {
-        println!("  {}. {:?}", idx + 1, item);
+        println!("  {}. {}", idx + 1, init_template_name(*item));
     }
 
     print!("Template [{}]: ", init_template_name(default_template));
@@ -366,11 +388,33 @@ fn init_template_name(template: cli::InitTemplate) -> &'static str {
         cli::InitTemplate::Node => "node",
         cli::InitTemplate::Pnpm => "pnpm",
         cli::InitTemplate::Yarn => "yarn",
+        cli::InitTemplate::Bun => "bun",
+        cli::InitTemplate::Deno => "deno",
+        cli::InitTemplate::Nextjs => "nextjs",
+        cli::InitTemplate::Vite => "vite",
+        cli::InitTemplate::Turbo => "turbo",
+        cli::InitTemplate::Nx => "nx",
         cli::InitTemplate::Python => "python",
+        cli::InitTemplate::Django => "django",
+        cli::InitTemplate::Fastapi => "fastapi",
+        cli::InitTemplate::Flask => "flask",
         cli::InitTemplate::Poetry => "poetry",
+        cli::InitTemplate::Hatch => "hatch",
+        cli::InitTemplate::Pixi => "pixi",
         cli::InitTemplate::Uv => "uv",
         cli::InitTemplate::Go => "go",
         cli::InitTemplate::CargoWorkspace => "cargo-workspace",
+        cli::InitTemplate::JavaGradle => "java-gradle",
+        cli::InitTemplate::JavaMaven => "java-maven",
+        cli::InitTemplate::KotlinGradle => "kotlin-gradle",
+        cli::InitTemplate::Dotnet => "dotnet",
+        cli::InitTemplate::PhpComposer => "php-composer",
+        cli::InitTemplate::RubyBundler => "ruby-bundler",
+        cli::InitTemplate::Rails => "rails",
+        cli::InitTemplate::Laravel => "laravel",
+        cli::InitTemplate::Terraform => "terraform",
+        cli::InitTemplate::Helm => "helm",
+        cli::InitTemplate::DockerCompose => "docker-compose",
         cli::InitTemplate::Cmake => "cmake",
         cli::InitTemplate::CmakeNinja => "cmake-ninja",
         cli::InitTemplate::Generic => "generic",
@@ -905,38 +949,7 @@ fn add_zip_dir<W: Write + Seek>(
 }
 
 fn template_warnings(template: cli::InitTemplate) -> Vec<&'static str> {
-    match template {
-        cli::InitTemplate::Rust => {
-            vec!["Rust starter uses cargo shell-based ci; review before CI use"]
-        }
-        cli::InitTemplate::Node => {
-            vec!["Node starter uses npm script conventions; ensure scripts exist"]
-        }
-        cli::InitTemplate::Pnpm => {
-            vec!["pnpm starter assumes pnpm scripts exist in package.json"]
-        }
-        cli::InitTemplate::Yarn => {
-            vec!["Yarn starter assumes yarn scripts exist in package.json"]
-        }
-        cli::InitTemplate::Python => vec!["Python starter assumes pytest and ruff are installed"],
-        cli::InitTemplate::Poetry => {
-            vec!["Poetry starter assumes poetry and project metadata are configured"]
-        }
-        cli::InitTemplate::Uv => vec!["uv starter assumes uv and Python tooling are installed"],
-        cli::InitTemplate::Go => vec!["Go starter assumes gofmt and go tooling are installed"],
-        cli::InitTemplate::CargoWorkspace => {
-            vec!["Cargo workspace starter assumes a Rust workspace layout"]
-        }
-        cli::InitTemplate::Cmake => vec![
-            "CMake starter uses a placeholder run target; replace it with your executable target",
-        ],
-        cli::InitTemplate::CmakeNinja => {
-            vec!["CMake Ninja starter assumes Ninja and CMake are installed"]
-        }
-        cli::InitTemplate::Generic => {
-            vec!["Generic starter is illustrative and should be customized"]
-        }
-    }
+    vec![config::template_spec(template).warning]
 }
 
 fn action_command(action: &Action) -> (String, Vec<String>) {
