@@ -112,12 +112,12 @@ fn run_named_command(
         let result = run_command_once(command, args, &config.root, &config.env);
         match result {
             Ok(status) if status.success() => return Ok(status),
-            Ok(status) if attempt < retries => {
+            Ok(_) if attempt < retries => {
                 attempt += 1;
                 continue;
             }
             Ok(status) => return Ok(status),
-            Err(err) if attempt < retries => {
+            Err(_) if attempt < retries => {
                 attempt += 1;
                 continue;
             }

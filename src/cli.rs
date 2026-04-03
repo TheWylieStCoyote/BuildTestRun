@@ -93,6 +93,12 @@ pub struct InitArgs {
 
     #[arg(long, value_enum, default_value_t = InitTemplate::Rust)]
     pub template: InitTemplate,
+
+    #[arg(long)]
+    pub interactive: bool,
+
+    #[arg(long, value_name = "PATH")]
+    pub template_file: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Args)]

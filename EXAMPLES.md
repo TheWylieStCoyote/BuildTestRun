@@ -20,6 +20,8 @@ mbr test -- my_test_name
 mbr exec lint
 mbr validate --strict
 mbr init --template node
+mbr init --interactive
+mbr init --template-file custom-template.toml
 mbr list
 mbr which
 mbr doctor --strict
@@ -139,6 +141,18 @@ Generate shell completions or a manpage:
 ```bash
 mbr completions bash
 mbr manpage
+```
+
+Interactive init:
+
+```bash
+mbr init --interactive
+```
+
+Custom template file:
+
+```bash
+mbr init --template-file custom-template.toml
 ```
 
 Pipeline commands avoid shell chaining:

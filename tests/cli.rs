@@ -343,6 +343,53 @@ fn init_supports_extended_template_catalog() {
 }
 
 #[test]
+fn init_supports_interactive_prompts() {
+    let temp = TempDir::new().expect("temp dir");
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["init", "--interactive"])
+        .write_stdin("demo\napp\nnode\n")
+        .assert()
+        .success();
+
+    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    assert!(contents.contains("name = \"demo\""));
+    assert!(contents.contains("root = \"app\""));
+    assert!(contents.contains("program = \"npm\""));
+}
+
+#[test]
+fn init_uses_custom_template_file() {
+    let temp = TempDir::new().expect("temp dir");
+    let template = temp.path().join("custom-template.toml");
+    fs::write(
+        &template,
+        r#"[project]
+name = "{{project_name}}"
+root = "{{project_root}}"
+
+[commands]
+build = "echo {{template}}"
+"#,
+    )
+    .expect("write template");
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["init", "--template-file", template.to_str().expect("path")])
+        .assert()
+        .success();
+
+    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    assert!(contents.contains("name = \"example\""));
+    assert!(contents.contains("root = \".\""));
+    assert!(contents.contains("echo rust"));
+}
+
+#[test]
 fn list_outputs_command_names() {
     let temp = TempDir::new().expect("temp dir");
     write_config(

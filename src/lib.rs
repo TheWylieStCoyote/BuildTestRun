@@ -23,7 +23,14 @@ pub fn run_from_args() -> Result<i32, Error> {
 
     match cli.action {
         Action::Validate(args) => validate_action(&start_dir, args.strict, cli.json),
-        Action::Init(args) => init_action(&start_dir, args.force, args.template, cli.json),
+        Action::Init(args) => init_action(
+            &start_dir,
+            args.force,
+            args.template,
+            args.interactive,
+            args.template_file,
+            cli.json,
+        ),
         Action::Workspace(args) => workspace_action(
             &start_dir, args.list, args.name, args.args, cli.json, cli.safe,
         ),
@@ -165,6 +172,8 @@ pub fn init_action(
     start_dir: &Path,
     force: bool,
     template: cli::InitTemplate,
+    interactive: bool,
+    template_file: Option<PathBuf>,
     json_output: bool,
 ) -> Result<i32, Error> {
     let path = start_dir.join(".mbr.toml");
@@ -172,23 +181,200 @@ pub fn init_action(
         return Err(Error::ConfigExists { path });
     }
 
-    fs::write(&path, config::starter_config_for(template)).map_err(|source| {
-        Error::ConfigWrite {
-            path: path.clone(),
-            source,
+    let init_spec = if interactive {
+        prompt_init_spec(template)?
+    } else {
+        InitSpec {
+            project_name: "example".to_string(),
+            project_root: ".".to_string(),
+            template,
         }
+    };
+
+    let rendered = render_init_template(&init_spec, template_file)?;
+
+    fs::write(&path, rendered).map_err(|source| Error::ConfigWrite {
+        path: path.clone(),
+        source,
     })?;
 
     if json_output {
         print_stable_json(json!({"status": "ok", "path": path}));
     } else {
         eprintln!("[mbr] wrote {}", path.display());
-        for warning in template_warnings(template) {
+        for warning in template_warnings(init_spec.template) {
             eprintln!("warning: {warning}");
         }
     }
 
     Ok(0)
+}
+
+struct InitSpec {
+    project_name: String,
+    project_root: String,
+    template: cli::InitTemplate,
+}
+
+fn prompt_init_spec(default_template: cli::InitTemplate) -> Result<InitSpec, Error> {
+    let project_name = prompt("Project name", "example")?;
+    let project_root = prompt("Project root", ".")?;
+    let template = prompt_template(default_template)?;
+
+    Ok(InitSpec {
+        project_name,
+        project_root,
+        template,
+    })
+}
+
+fn prompt(label: &str, default: &str) -> Result<String, Error> {
+    use std::io::{stdin, stdout};
+
+    print!("{label} [{default}]: ");
+    stdout()
+        .flush()
+        .map_err(|source| Error::Execution(source.to_string()))?;
+
+    let mut input = String::new();
+    stdin()
+        .read_line(&mut input)
+        .map_err(|source| Error::Execution(source.to_string()))?;
+
+    let value = input.trim();
+    Ok(if value.is_empty() {
+        default.to_string()
+    } else {
+        value.to_string()
+    })
+}
+
+fn prompt_template(default_template: cli::InitTemplate) -> Result<cli::InitTemplate, Error> {
+    use std::io::{stdin, stdout};
+
+    let templates = [
+        cli::InitTemplate::Rust,
+        cli::InitTemplate::Node,
+        cli::InitTemplate::Pnpm,
+        cli::InitTemplate::Yarn,
+        cli::InitTemplate::Python,
+        cli::InitTemplate::Poetry,
+        cli::InitTemplate::Uv,
+        cli::InitTemplate::Go,
+        cli::InitTemplate::CargoWorkspace,
+        cli::InitTemplate::Cmake,
+        cli::InitTemplate::CmakeNinja,
+        cli::InitTemplate::Generic,
+    ];
+
+    println!("Choose a template:");
+    for (idx, item) in templates.iter().enumerate() {
+        println!("  {}. {:?}", idx + 1, item);
+    }
+
+    print!("Template [{}]: ", init_template_name(default_template));
+    stdout()
+        .flush()
+        .map_err(|source| Error::Execution(source.to_string()))?;
+
+    let mut input = String::new();
+    stdin()
+        .read_line(&mut input)
+        .map_err(|source| Error::Execution(source.to_string()))?;
+    let value = input.trim();
+    if value.is_empty() {
+        return Ok(default_template);
+    }
+
+    if let Ok(index) = value.parse::<usize>()
+        && let Some(template) = templates.get(index.saturating_sub(1))
+    {
+        return Ok(*template);
+    }
+
+    templates
+        .iter()
+        .copied()
+        .find(|template| init_template_name(*template).eq_ignore_ascii_case(value))
+        .ok_or_else(|| Error::Execution(format!("unknown template selection: {value}")))
+}
+
+fn render_init_template(spec: &InitSpec, template_file: Option<PathBuf>) -> Result<String, Error> {
+    let contents = if let Some(path) = template_file {
+        fs::read_to_string(&path).map_err(|source| Error::TemplateRead { path, source })?
+    } else {
+        config::starter_config_for(spec.template).to_string()
+    };
+
+    Ok(rewrite_init_template(
+        &contents,
+        &spec.project_name,
+        &spec.project_root,
+        spec.template,
+    ))
+}
+
+fn rewrite_init_template(
+    contents: &str,
+    project_name: &str,
+    project_root: &str,
+    template: cli::InitTemplate,
+) -> String {
+    let replaced = contents
+        .replace("{{project_name}}", project_name)
+        .replace("{{project_root}}", project_root)
+        .replace("{{template}}", init_template_name(template));
+
+    let mut in_project = false;
+    let mut replaced_name = false;
+    let mut replaced_root = false;
+    let mut lines = Vec::new();
+
+    for line in replaced.lines() {
+        let trimmed = line.trim();
+        if trimmed == "[project]" {
+            in_project = true;
+            lines.push(line.to_string());
+            continue;
+        }
+
+        if in_project && trimmed.starts_with('[') && trimmed.ends_with(']') {
+            in_project = false;
+        }
+
+        if in_project && !replaced_name && trimmed.starts_with("name = ") {
+            lines.push(format!("name = \"{project_name}\""));
+            replaced_name = true;
+            continue;
+        }
+
+        if in_project && !replaced_root && trimmed.starts_with("root = ") {
+            lines.push(format!("root = \"{project_root}\""));
+            replaced_root = true;
+            continue;
+        }
+
+        lines.push(line.to_string());
+    }
+
+    lines.join("\n")
+}
+
+fn init_template_name(template: cli::InitTemplate) -> &'static str {
+    match template {
+        cli::InitTemplate::Rust => "rust",
+        cli::InitTemplate::Node => "node",
+        cli::InitTemplate::Pnpm => "pnpm",
+        cli::InitTemplate::Yarn => "yarn",
+        cli::InitTemplate::Python => "python",
+        cli::InitTemplate::Poetry => "poetry",
+        cli::InitTemplate::Uv => "uv",
+        cli::InitTemplate::Go => "go",
+        cli::InitTemplate::CargoWorkspace => "cargo-workspace",
+        cli::InitTemplate::Cmake => "cmake",
+        cli::InitTemplate::CmakeNinja => "cmake-ninja",
+        cli::InitTemplate::Generic => "generic",
+    }
 }
 
 pub fn package_action(

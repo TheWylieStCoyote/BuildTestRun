@@ -15,6 +15,8 @@ mbr run
 mbr exec lint
 mbr validate --strict
 mbr init --template node
+mbr init --interactive
+mbr init --template-file custom-template.toml
 mbr list
 mbr list --verbose
 mbr which
@@ -64,6 +66,8 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Validates config with `mbr validate`
 - Supports `--strict` for `validate` and `doctor`
 - Generates a starter config with `mbr init --template <name>`
+- Supports interactive prompts with `mbr init --interactive`
+- Supports custom template files with `mbr init --template-file <path>`
 - Starter templates include rust, node, pnpm, yarn, python, poetry, uv, go, cargo-workspace, cmake, cmake-ninja, and generic
 - Lists commands and descriptions with `mbr list`
 - Shows resolved config with `mbr which`

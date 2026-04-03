@@ -44,6 +44,8 @@ When a user runs `mbr build`, `mbr test`, `mbr run`, or `mbr exec <name>`, the C
 `mbr validate --strict` should fail on missing conventional commands.
 `mbr init` should create a starter `.mbr.toml` in the current directory, with templates for common ecosystems.
 Template variants should include rust, node, pnpm, yarn, python, poetry, uv, go, cargo-workspace, cmake, cmake-ninja, and generic.
+`mbr init --interactive` should prompt for project name, root, and template.
+`mbr init --template-file <path>` should render a custom starter template from a file.
 `mbr list` should print available command names and optional descriptions.
 `mbr which` should show the resolved config path and project root.
 `mbr doctor` should report missing commands and PATH issues.

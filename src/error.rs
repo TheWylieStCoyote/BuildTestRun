@@ -19,6 +19,9 @@ pub enum Error {
     #[error("failed to write config {path}: {source}")]
     ConfigWrite { path: PathBuf, source: io::Error },
 
+    #[error("failed to read template {path}: {source}")]
+    TemplateRead { path: PathBuf, source: io::Error },
+
     #[error("failed to parse config {path}: {source}")]
     ConfigParse {
         path: PathBuf,
