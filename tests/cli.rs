@@ -333,7 +333,7 @@ fn init_supports_extended_template_catalog() {
         ("hatch", "program = \"hatch\""),
         ("pixi", "program = \"pixi\""),
         ("uv", "program = \"uv\""),
-        ("cargo-workspace", "--workspace"),
+        ("cargo-workspace", "default workspace member"),
         ("java-gradle", "gradlew"),
         ("java-maven", "mvn"),
         ("kotlin-gradle", "gradlew"),
@@ -384,6 +384,41 @@ fn init_supports_interactive_prompts() {
 }
 
 #[test]
+fn init_interactive_safe_mode_rejects_shell_templates() {
+    let temp = TempDir::new().expect("temp dir");
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["init", "--interactive"])
+        .write_stdin("demo\n.\ngeneric\nn\nn\nn\nn\ny\n")
+        .assert()
+        .failure()
+        .stderr(contains("safe init template forbids shell command"));
+
+    assert!(!temp.path().join(".mbr.toml").exists());
+}
+
+#[test]
+fn init_generic_template_can_include_optional_commands() {
+    let temp = TempDir::new().expect("temp dir");
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["init", "--interactive"])
+        .write_stdin("demo\n.\ngeneric\ny\ny\ny\ny\nn\n")
+        .assert()
+        .success();
+
+    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    assert!(contents.contains("docs = \"echo docs\""));
+    assert!(contents.contains("dev = \"echo dev\""));
+    assert!(contents.contains("lint = \"echo lint\""));
+    assert!(contents.contains("typecheck = \"echo typecheck\""));
+}
+
+#[test]
 fn init_uses_custom_template_file() {
     let temp = TempDir::new().expect("temp dir");
     let template = temp.path().join("custom-template.toml");
@@ -410,6 +445,57 @@ build = "echo {{template}}"
     assert!(contents.contains("name = \"example\""));
     assert!(contents.contains("root = \".\""));
     assert!(contents.contains("echo rust"));
+}
+
+#[test]
+fn init_uses_custom_template_directory() {
+    let temp = TempDir::new().expect("temp dir");
+    let template_dir = temp.path().join("template-dir");
+    fs::create_dir_all(&template_dir).expect("create template dir");
+    fs::write(
+        template_dir.join("template.toml"),
+        r#"[project]
+name = "{{project_name}}"
+root = "{{project_root}}"
+
+[commands]
+build = "echo {{template}}"
+"#,
+    )
+    .expect("write template");
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args([
+            "init",
+            "--template-file",
+            template_dir.to_str().expect("path"),
+        ])
+        .assert()
+        .success();
+
+    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    assert!(contents.contains("name = \"example\""));
+    assert!(contents.contains("root = \".\""));
+    assert!(contents.contains("echo rust"));
+}
+
+#[test]
+fn init_rejects_invalid_custom_template() {
+    let temp = TempDir::new().expect("temp dir");
+    let template = temp.path().join("invalid-template.toml");
+    fs::write(&template, "[project\nname = 'broken'\n").expect("write invalid template");
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["init", "--template-file", template.to_str().expect("path")])
+        .assert()
+        .failure()
+        .stderr(contains("generated init template is invalid"));
+
+    assert!(!temp.path().join(".mbr.toml").exists());
 }
 
 #[test]

@@ -804,6 +804,7 @@ build = { program = "cargo", args = ["build"], description = "Compile the projec
 test = { program = "cargo", args = ["test"], description = "Run tests" }
 run = { program = "cargo", args = ["run"], description = "Run the app" }
 fmt = { program = "cargo", args = ["fmt", "--all"], description = "Format source files" }
+docs = { program = "cargo", args = ["doc"], description = "Generate documentation" }
 clean = { program = "cargo", args = ["clean"], description = "Remove build artifacts" }
 ci = { steps = ["fmt", "lint", "test"], description = "Run the standard checks" }
 lint = { program = "cargo", args = ["clippy", "--all-targets", "--all-features", "--", "-D", "warnings"], description = "Run Clippy" }
@@ -1370,8 +1371,9 @@ root = "."
 [commands]
 build = { program = "cargo", args = ["build", "--workspace"], description = "Build workspace packages" }
 test = { program = "cargo", args = ["test", "--workspace"], description = "Run workspace tests" }
-run = { program = "cargo", args = ["run", "--workspace"], description = "Run the selected package" }
+run = { program = "cargo", args = ["run"], description = "Run the default workspace member" }
 fmt = { program = "cargo", args = ["fmt", "--all"], description = "Format source files" }
+docs = { program = "cargo", args = ["doc", "--workspace"], description = "Generate workspace documentation" }
 lint = { program = "cargo", args = ["clippy", "--workspace", "--all-targets", "--all-features", "--", "-D", "warnings"], description = "Run Clippy" }
 check = { program = "cargo", args = ["check", "--workspace"], description = "Run workspace checks" }
 clean = { program = "cargo", args = ["clean"], description = "Remove build artifacts" }
@@ -1388,7 +1390,6 @@ root = "."
 [commands]
 build = { program = "cmake", args = ["-S", ".", "-B", "build"], description = "Configure the build" }
 test = { program = "ctest", args = ["--test-dir", "build"], description = "Run tests" }
-run = { program = "cmake", args = ["--build", "build", "--target", "run"], description = "Replace with your executable target" }
 fmt = { program = "cmake-format", args = ["-i", "CMakeLists.txt"], description = "Format CMake files" }
 lint = { program = "cmake", args = ["-S", ".", "-B", "build"], description = "Configure the build" }
 check = { program = "cmake", args = ["-S", ".", "-B", "build"], description = "Validate the build configuration" }
@@ -1406,7 +1407,6 @@ root = "."
 [commands]
 build = { program = "cmake", args = ["-S", ".", "-B", "build", "-G", "Ninja"], description = "Configure the build" }
 test = { program = "ctest", args = ["--test-dir", "build"], description = "Run tests" }
-run = { program = "cmake", args = ["--build", "build", "--target", "run"], description = "Replace with your executable target" }
 fmt = { program = "cmake-format", args = ["-i", "CMakeLists.txt"], description = "Format CMake files" }
 lint = { program = "cmake", args = ["-S", ".", "-B", "build", "-G", "Ninja"], description = "Configure the build" }
 check = { program = "cmake", args = ["-S", ".", "-B", "build", "-G", "Ninja"], description = "Validate the build configuration" }

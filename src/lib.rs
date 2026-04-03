@@ -188,6 +188,8 @@ pub fn init_action(
             project_name: "example".to_string(),
             project_root: ".".to_string(),
             template,
+            safe_mode: false,
+            optional_commands: Vec::new(),
         }
     };
 
@@ -214,17 +216,23 @@ struct InitSpec {
     project_name: String,
     project_root: String,
     template: cli::InitTemplate,
+    safe_mode: bool,
+    optional_commands: Vec<String>,
 }
 
 fn prompt_init_spec(default_template: cli::InitTemplate) -> Result<InitSpec, Error> {
     let project_name = prompt("Project name", "example")?;
     let project_root = prompt("Project root", ".")?;
     let template = prompt_template(default_template)?;
+    let optional_commands = prompt_optional_commands(template)?;
+    let safe_mode = prompt_yes_no("Enable safe structured-only mode", false)?;
 
     Ok(InitSpec {
         project_name,
         project_root,
         template,
+        safe_mode,
+        optional_commands,
     })
 }
 
@@ -321,19 +329,148 @@ fn prompt_template(default_template: cli::InitTemplate) -> Result<cli::InitTempl
         .ok_or_else(|| Error::Execution(format!("unknown template selection: {value}")))
 }
 
+fn prompt_yes_no(label: &str, default: bool) -> Result<bool, Error> {
+    use std::io::{stdin, stdout};
+
+    let default_text = if default { "Y/n" } else { "y/N" };
+    print!("{label} [{default_text}]: ");
+    stdout()
+        .flush()
+        .map_err(|source| Error::Execution(source.to_string()))?;
+
+    let mut input = String::new();
+    stdin()
+        .read_line(&mut input)
+        .map_err(|source| Error::Execution(source.to_string()))?;
+
+    let value = input.trim().to_ascii_lowercase();
+    if value.is_empty() {
+        return Ok(default);
+    }
+
+    match value.as_str() {
+        "y" | "yes" | "true" => Ok(true),
+        "n" | "no" | "false" => Ok(false),
+        _ => Err(Error::Execution(format!(
+            "invalid yes/no response: {value}"
+        ))),
+    }
+}
+
+fn prompt_optional_commands(template: cli::InitTemplate) -> Result<Vec<String>, Error> {
+    if template != cli::InitTemplate::Generic {
+        return Ok(Vec::new());
+    }
+
+    let mut commands = Vec::new();
+    if prompt_yes_no("Include docs command", false)? {
+        commands.push("docs".to_string());
+    }
+    if prompt_yes_no("Include dev command", false)? {
+        commands.push("dev".to_string());
+    }
+    if prompt_yes_no("Include lint command", false)? {
+        commands.push("lint".to_string());
+    }
+    if prompt_yes_no("Include typecheck command", false)? {
+        commands.push("typecheck".to_string());
+    }
+
+    Ok(commands)
+}
+
 fn render_init_template(spec: &InitSpec, template_file: Option<PathBuf>) -> Result<String, Error> {
     let contents = if let Some(path) = template_file {
-        fs::read_to_string(&path).map_err(|source| Error::TemplateRead { path, source })?
+        read_template_source(&path)?
     } else {
         config::starter_config_for(spec.template).to_string()
     };
 
-    Ok(rewrite_init_template(
+    let rendered = rewrite_init_template(
         &contents,
         &spec.project_name,
         &spec.project_root,
         spec.template,
-    ))
+    );
+
+    let rendered = if spec.optional_commands.is_empty() {
+        rendered
+    } else {
+        append_generic_optional_commands(&rendered, &spec.optional_commands)
+    };
+
+    validate_rendered_init_template(&rendered)?;
+    if spec.safe_mode {
+        validate_safe_rendered_init_template(&rendered)?;
+    }
+    Ok(rendered)
+}
+
+fn read_template_source(path: &Path) -> Result<String, Error> {
+    if path.is_dir() {
+        for candidate in [".mbr.toml", "template.toml", "mbr.toml", "init.toml"] {
+            let candidate_path = path.join(candidate);
+            if candidate_path.is_file() {
+                return fs::read_to_string(&candidate_path).map_err(|source| Error::TemplateRead {
+                    path: candidate_path,
+                    source,
+                });
+            }
+        }
+
+        return Err(Error::TemplateNotFound {
+            path: path.to_path_buf(),
+        });
+    }
+
+    fs::read_to_string(path).map_err(|source| Error::TemplateRead {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+fn validate_rendered_init_template(rendered: &str) -> Result<(), Error> {
+    toml::from_str::<toml::Value>(rendered).map_err(|source| Error::InitTemplateParse {
+        source: Box::new(source),
+    })?;
+    Ok(())
+}
+
+fn validate_safe_rendered_init_template(rendered: &str) -> Result<(), Error> {
+    let parsed = toml::from_str::<config::ProjectFile>(rendered).map_err(|source| {
+        Error::InitTemplateParse {
+            source: Box::new(source),
+        }
+    })?;
+
+    for name in parsed.commands.names() {
+        if let Some(command) = parsed.commands.get(&name)
+            && command.is_shell()
+        {
+            return Err(Error::UnsafeInitTemplate { name });
+        }
+    }
+
+    Ok(())
+}
+
+fn append_generic_optional_commands(rendered: &str, optional_commands: &[String]) -> String {
+    let mut output = String::from(rendered);
+    if !output.ends_with('\n') {
+        output.push('\n');
+    }
+
+    for name in optional_commands {
+        match name.as_str() {
+            "docs" => output.push_str("docs = \"echo docs\"\n"),
+            "dev" => output.push_str("dev = \"echo dev\"\n"),
+            "lint" => output.push_str("lint = \"echo lint\"\n"),
+            "typecheck" => output.push_str("typecheck = \"echo typecheck\"\n"),
+            _ => {}
+        }
+    }
+
+    output
 }
 
 fn rewrite_init_template(

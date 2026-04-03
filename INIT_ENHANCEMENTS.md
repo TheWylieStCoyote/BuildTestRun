@@ -40,8 +40,8 @@
 ## Implemented Improvements
 
 - [x] Replace shell-string CI entries with structured pipelines where possible.
-- [x] Add more commands like `lint`, `check`, `dev`, and `typecheck` where they make sense.
-- [ ] Make `run` less placeholder-heavy in `cmake` and `cargo-workspace`.
+- [x] Add more commands like `lint`, `check`, `dev`, `docs`, and `typecheck` where they make sense.
+- [x] Make `run` less placeholder-heavy in `cmake`.
 - [x] Prefer structured commands over inline shell for cleanup and CI tasks.
 - [x] Improve descriptions so `list --verbose` and `show` are more useful.
 - [x] Make Python templates reflect toolchain style more clearly.
@@ -52,19 +52,19 @@
 - [x] Prompt for project name.
 - [x] Prompt for template.
 - [x] Prompt for project root.
-- [ ] Prompt for optional commands.
-- [ ] Prompt for safe structured-only mode.
+- [x] Prompt for optional commands.
+- [x] Prompt for safe structured-only mode.
 
 ## Implemented Custom Templates
 
 - [x] Add support for `mbr init --template-file <path>`.
 - [x] Render placeholders before writing `.mbr.toml`.
-- [ ] Validate rendered TOML before writing.
+- [x] Validate rendered TOML before writing.
+- [x] Add directory-based custom templates.
 
 ## Planned Follow-Up
 
-- [ ] Add more template-specific optional commands.
-- [ ] Improve `cmake` and `cargo-workspace` run commands.
-- [ ] Add interactive toggles for optional commands.
-- [ ] Add directory-based custom templates.
-- [ ] Add post-render validation for custom templates.
+- [x] Add more template-specific optional commands.
+- [x] Improve `cmake` run commands.
+- [x] Add interactive toggles for optional commands.
+- [x] Add post-render validation for custom templates.

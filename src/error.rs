@@ -22,6 +22,15 @@ pub enum Error {
     #[error("failed to read template {path}: {source}")]
     TemplateRead { path: PathBuf, source: io::Error },
 
+    #[error("no template file found in {path}")]
+    TemplateNotFound { path: PathBuf },
+
+    #[error("generated init template is invalid: {source}")]
+    InitTemplateParse { source: Box<toml::de::Error> },
+
+    #[error("safe init template forbids shell command `{name}`")]
+    UnsafeInitTemplate { name: String },
+
     #[error("failed to parse config {path}: {source}")]
     ConfigParse {
         path: PathBuf,

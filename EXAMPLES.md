@@ -149,10 +149,11 @@ Interactive init:
 mbr init --interactive
 ```
 
-Custom template file:
+Custom template file or directory:
 
 ```bash
 mbr init --template-file custom-template.toml
+mbr init --template-file custom-template-dir
 ```
 
 Pipeline commands avoid shell chaining:

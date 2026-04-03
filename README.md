@@ -67,7 +67,8 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Supports `--strict` for `validate` and `doctor`
 - Generates a starter config with `mbr init --template <name>`
 - Supports interactive prompts with `mbr init --interactive`
-- Supports custom template files with `mbr init --template-file <path>`
+- Supports custom template files or directories with `mbr init --template-file <path>`
+- Interactive init can add optional command stubs and enable safe structured-only mode
 - Starter templates include rust, node, pnpm, yarn, bun, deno, nextjs, vite, turbo, nx, python, django, fastapi, flask, poetry, hatch, pixi, uv, go, cargo-workspace, java-gradle, java-maven, kotlin-gradle, dotnet, php-composer, ruby-bundler, rails, laravel, terraform, helm, docker-compose, cmake, cmake-ninja, and generic
 - Lists commands and descriptions with `mbr list`
 - Shows resolved config with `mbr which`
