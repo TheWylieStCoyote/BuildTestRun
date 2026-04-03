@@ -76,7 +76,9 @@ fn unknown_command_error(name: &str) -> Error {
 fn build_command(command: &CommandSpec, extra_args: &[String]) -> Command {
     match command {
         CommandSpec::Shell(base) => shell_command(base, extra_args),
-        CommandSpec::Program { program, args, env } => {
+        CommandSpec::Program {
+            program, args, env, ..
+        } => {
             let mut cmd = Command::new(program);
             cmd.args(args).args(extra_args);
             for (key, value) in env {

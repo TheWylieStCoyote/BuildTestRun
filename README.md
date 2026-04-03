@@ -14,7 +14,7 @@ mbr test
 mbr run
 mbr exec lint
 mbr validate
-mbr init
+mbr init --template node
 mbr list
 mbr which
 mbr doctor
@@ -49,10 +49,10 @@ lint = { program = "cargo", args = ["clippy", "--all-targets", "--all-features",
 - Supports named commands via `mbr exec <name>`
 - Forwards extra arguments after `--`
 - Validates config with `mbr validate`
-- Generates a starter config with `mbr init`
-- Lists commands with `mbr list`
+- Generates a starter config with `mbr init --template <name>`
+- Lists commands and descriptions with `mbr list`
 - Shows resolved config with `mbr which`
-- Checks for common issues with `mbr doctor`
+- Checks for missing commands and PATH issues with `mbr doctor`
 - Supports `--dry-run` for execution commands
 - Uses the configured project root when provided
 - Passes config environment variables to the child process

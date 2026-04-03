@@ -13,17 +13,33 @@ fn mkdir(dir: &Path, name: &str) -> std::path::PathBuf {
     path
 }
 
+fn print_command_spec(output: &str) -> String {
+    if cfg!(windows) {
+        format!(r#"{{ program = "cmd", args = ["/C", "echo {output}"] }}"#)
+    } else {
+        format!(r#"{{ program = "sh", args = ["-c", "printf {output}"] }}"#)
+    }
+}
+
+fn arg_pair_command_spec() -> String {
+    if cfg!(windows) {
+        r#"{ program = "cmd", args = ["/C", "echo %1^|%2"] }"#.to_string()
+    } else {
+        r#"{ program = "sh", args = ["-c", "printf '%s|%s' \"$1\" \"$2\"", "sh"] }"#.to_string()
+    }
+}
+
 #[test]
 fn build_runs_configured_command() {
     let temp = TempDir::new().expect("temp dir");
     write_config(
         temp.path(),
-        r#"
-[commands]
-build = { program = "sh", args = ["-c", "printf build-ok"] }
-test = { program = "sh", args = ["-c", "printf test-ok"] }
-run = { program = "sh", args = ["-c", "printf run-ok"] }
-"#,
+        &format!(
+            "[commands]\nbuild = {}\ntest = {}\nrun = {}\n",
+            print_command_spec("build-ok"),
+            print_command_spec("test-ok"),
+            print_command_spec("run-ok")
+        ),
     );
 
     Command::cargo_bin("mbr")
@@ -40,10 +56,7 @@ fn build_forwards_extra_args() {
     let temp = TempDir::new().expect("temp dir");
     write_config(
         temp.path(),
-        r#"
-[commands]
-build = { program = "sh", args = ["-c", "printf '%s|%s' \"$1\" \"$2\"", "sh"] }
-"#,
+        &format!("[commands]\nbuild = {}\n", arg_pair_command_spec()),
     );
 
     Command::cargo_bin("mbr")
@@ -60,11 +73,11 @@ fn executes_named_command() {
     let temp = TempDir::new().expect("temp dir");
     write_config(
         temp.path(),
-        r#"
-[commands]
-lint = { program = "sh", args = ["-c", "printf lint-ok"] }
-build = { program = "sh", args = ["-c", "printf build-ok"] }
-"#,
+        &format!(
+            "[commands]\nlint = {}\nbuild = {}\n",
+            print_command_spec("lint-ok"),
+            print_command_spec("build-ok")
+        ),
     );
 
     Command::cargo_bin("mbr")
@@ -81,12 +94,12 @@ fn fmt_clean_and_ci_run_project_commands() {
     let temp = TempDir::new().expect("temp dir");
     write_config(
         temp.path(),
-        r#"
-[commands]
-fmt = { program = "sh", args = ["-c", "printf fmt-ok"] }
-clean = { program = "sh", args = ["-c", "printf clean-ok"] }
-ci = { program = "sh", args = ["-c", "printf ci-ok"] }
-"#,
+        &format!(
+            "[commands]\nfmt = {}\nclean = {}\nci = {}\n",
+            print_command_spec("fmt-ok"),
+            print_command_spec("clean-ok"),
+            print_command_spec("ci-ok")
+        ),
     );
 
     for (cmd, expected) in [("fmt", "fmt-ok"), ("clean", "clean-ok"), ("ci", "ci-ok")] {
@@ -105,10 +118,7 @@ fn discovers_config_from_subdirectory() {
     let temp = TempDir::new().expect("temp dir");
     write_config(
         temp.path(),
-        r#"
-[commands]
-run = { program = "sh", args = ["-c", "printf run-ok"] }
-"#,
+        &format!("[commands]\nrun = {}\n", print_command_spec("run-ok")),
     );
     let nested = mkdir(temp.path(), "nested");
 
@@ -153,10 +163,7 @@ fn validate_succeeds_for_valid_config() {
     let temp = TempDir::new().expect("temp dir");
     write_config(
         temp.path(),
-        r#"
-[commands]
-build = { program = "sh", args = ["-c", "printf build-ok"] }
-"#,
+        &format!("[commands]\nbuild = {}\n", print_command_spec("build-ok")),
     );
 
     Command::cargo_bin("mbr")
@@ -183,6 +190,22 @@ fn init_writes_starter_config() {
     let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
     assert!(contents.contains("[commands]"));
     assert!(contents.contains("program = \"cargo\""));
+}
+
+#[test]
+fn init_uses_requested_template() {
+    let temp = TempDir::new().expect("temp dir");
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["init", "--template", "node"])
+        .assert()
+        .success();
+
+    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    assert!(contents.contains("program = \"npm\""));
+    assert!(contents.contains("run = { program = \"npm\""));
 }
 
 #[test]
@@ -213,6 +236,26 @@ test = { program = "cargo", args = ["test"] }
         .stdout(contains("fmt"))
         .stdout(contains("lint"))
         .stdout(contains("test"));
+}
+
+#[test]
+fn list_shows_command_descriptions() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = { program = "cargo", args = ["build"], description = "Compile the project" }
+"#,
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .arg("list")
+        .assert()
+        .success()
+        .stdout(contains("build - Compile the project"));
 }
 
 #[test]
@@ -278,4 +321,28 @@ build = { program = "cargo", args = ["build"] }
         .success()
         .stdout(contains("config:"))
         .stdout(contains("warning:"));
+}
+
+#[test]
+fn doctor_flags_missing_common_commands() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = { program = "cargo", args = ["build"] }
+test = { program = "cargo", args = ["test"] }
+run = { program = "cargo", args = ["run"] }
+"#,
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(contains("missing fmt command"))
+        .stdout(contains("missing clean command"))
+        .stdout(contains("missing ci command"));
 }

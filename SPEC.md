@@ -37,10 +37,10 @@ When a user runs `mbr build`, `mbr test`, `mbr run`, or `mbr exec <name>`, the C
 6. Exit with the same status code as the underlying command.
 
 `mbr validate` should parse and validate the config without executing anything.
-`mbr init` should create a starter `.mbr.toml` in the current directory.
-`mbr list` should print available command names.
+`mbr init` should create a starter `.mbr.toml` in the current directory, with templates for common ecosystems.
+`mbr list` should print available command names and optional descriptions.
 `mbr which` should show the resolved config path and project root.
-`mbr doctor` should report common configuration issues.
+`mbr doctor` should report missing commands and PATH issues.
 
 ## Config File
 

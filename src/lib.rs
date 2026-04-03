@@ -20,7 +20,7 @@ pub fn run_from_args() -> Result<i32, Error> {
 
     match cli.action {
         Action::Validate => validate_action(&cwd, cli.json),
-        Action::Init(args) => init_action(&cwd, args.force, cli.json),
+        Action::Init(args) => init_action(&cwd, args.force, args.template, cli.json),
         Action::List => list_action(&cwd, cli.json),
         Action::Which => which_action(&cwd, cli.json),
         Action::Doctor => doctor_action(&cwd, cli.json),
@@ -60,15 +60,22 @@ pub fn validate_action(start_dir: &Path, json_output: bool) -> Result<i32, Error
     Ok(0)
 }
 
-pub fn init_action(start_dir: &Path, force: bool, json_output: bool) -> Result<i32, Error> {
+pub fn init_action(
+    start_dir: &Path,
+    force: bool,
+    template: cli::InitTemplate,
+    json_output: bool,
+) -> Result<i32, Error> {
     let path = start_dir.join(".mbr.toml");
     if path.exists() && !force {
         return Err(Error::ConfigExists { path });
     }
 
-    fs::write(&path, config::starter_config()).map_err(|source| Error::ConfigWrite {
-        path: path.clone(),
-        source,
+    fs::write(&path, config::starter_config_for(template)).map_err(|source| {
+        Error::ConfigWrite {
+            path: path.clone(),
+            source,
+        }
     })?;
 
     if json_output {
@@ -82,13 +89,32 @@ pub fn init_action(start_dir: &Path, force: bool, json_output: bool) -> Result<i
 
 pub fn list_action(start_dir: &Path, json_output: bool) -> Result<i32, Error> {
     let (_, config) = load_project(start_dir)?;
-    let mut names = config.commands.names();
+    let entries: Vec<_> = config
+        .commands
+        .names()
+        .into_iter()
+        .map(|name| {
+            let description = config
+                .commands
+                .get(&name)
+                .and_then(|command| command.description())
+                .map(|description| description.to_string());
+            (name, description)
+        })
+        .collect();
 
     if json_output {
-        println!("{}", json!({"commands": names}));
+        let commands: Vec<_> = entries
+            .iter()
+            .map(|(name, description)| json!({"name": name, "description": description}))
+            .collect();
+        println!("{}", json!({"commands": commands}));
     } else {
-        for name in names.drain(..) {
-            println!("{name}");
+        for (name, description) in entries {
+            match description {
+                Some(description) => println!("{name} - {description}"),
+                None => println!("{name}"),
+            }
         }
     }
 
@@ -118,17 +144,33 @@ pub fn doctor_action(start_dir: &Path, json_output: bool) -> Result<i32, Error> 
     let (config_path, config) = load_project(start_dir)?;
     let mut warnings = Vec::new();
 
-    if config.commands.build.is_none() {
-        warnings.push("missing build command".to_string());
+    for builtin in ["build", "test", "run", "fmt", "clean", "ci"] {
+        if config.commands.get(builtin).is_none() {
+            warnings.push(format!("missing {builtin} command"));
+        }
     }
-    if config.commands.test.is_none() {
-        warnings.push("missing test command".to_string());
-    }
-    if config.commands.run.is_none() {
-        warnings.push("missing run command".to_string());
-    }
+
     if config.commands.extra.is_empty() {
         warnings.push("no extra named commands defined".to_string());
+    }
+
+    for name in config.commands.names() {
+        if let Some(command) = config.commands.get(&name) {
+            match command {
+                config::CommandSpec::Program { program, .. } => {
+                    if !program_on_path(program) {
+                        warnings.push(format!(
+                            "command `{name}` program `{program}` was not found on PATH"
+                        ));
+                    }
+                }
+                config::CommandSpec::Shell(_) => {
+                    warnings.push(format!(
+                        "command `{name}` uses a shell string; PATH checks are skipped"
+                    ));
+                }
+            }
+        }
     }
 
     if json_output {
@@ -162,7 +204,7 @@ pub fn dry_run_action(action: Action, start_dir: &Path, json_output: bool) -> Re
         .commands
         .get(&command_name)
         .ok_or_else(|| unknown_command_error(&command_name))?;
-    let rendered = command.describe(&args);
+    let rendered = command.render(&args);
 
     if json_output {
         println!(
@@ -179,6 +221,49 @@ pub fn dry_run_action(action: Action, start_dir: &Path, json_output: bool) -> Re
     }
 
     Ok(0)
+}
+
+fn program_on_path(program: &str) -> bool {
+    let path = std::path::Path::new(program);
+    if path.components().count() > 1 {
+        return path.exists();
+    }
+
+    let Some(paths) = std::env::var_os("PATH") else {
+        return false;
+    };
+
+    for dir in std::env::split_paths(&paths) {
+        if cfg!(windows) {
+            let exts = std::env::var_os("PATHEXT")
+                .map(|value| {
+                    value
+                        .to_string_lossy()
+                        .split(';')
+                        .map(|ext| ext.trim().to_ascii_lowercase())
+                        .filter(|ext| !ext.is_empty())
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_else(|| {
+                    vec![".exe".to_string(), ".cmd".to_string(), ".bat".to_string()]
+                });
+
+            for ext in exts {
+                let candidate = dir.join(format!("{program}{ext}"));
+                if candidate.is_file() {
+                    return true;
+                }
+            }
+
+            if dir.join(program).is_file() {
+                return true;
+            }
+        } else if dir.join(program).is_file() {
+            return true;
+        }
+    }
+
+    false
 }
 
 fn load_project(start_dir: &Path) -> Result<(PathBuf, config::ProjectConfig), Error> {
@@ -212,6 +297,15 @@ fn unknown_command_error(name: &str) -> Error {
         },
         "run" => Error::MissingCommand {
             action: Action::Run(cli::CommandArgs { args: vec![] }),
+        },
+        "fmt" => Error::MissingCommand {
+            action: Action::Fmt(cli::CommandArgs { args: vec![] }),
+        },
+        "clean" => Error::MissingCommand {
+            action: Action::Clean(cli::CommandArgs { args: vec![] }),
+        },
+        "ci" => Error::MissingCommand {
+            action: Action::Ci(cli::CommandArgs { args: vec![] }),
         },
         other => Error::UnknownCommand {
             name: other.to_string(),

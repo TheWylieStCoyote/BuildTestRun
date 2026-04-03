@@ -1,4 +1,4 @@
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, Subcommand)]
@@ -15,6 +15,16 @@ pub enum Action {
     List,
     Which,
     Doctor,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum InitTemplate {
+    Rust,
+    Node,
+    Python,
+    Go,
+    Cmake,
+    Generic,
 }
 
 impl fmt::Display for Action {
@@ -54,6 +64,9 @@ pub struct ExecArgs {
 pub struct InitArgs {
     #[arg(long)]
     pub force: bool,
+
+    #[arg(long, value_enum, default_value_t = InitTemplate::Rust)]
+    pub template: InitTemplate,
 }
 
 #[derive(Debug, Parser)]
