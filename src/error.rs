@@ -34,9 +34,24 @@ pub enum Error {
     #[error("unknown command `{name}`")]
     UnknownCommand { name: String },
 
+    #[error("unknown base command `{base}` for `{name}`")]
+    UnknownCommandBase { name: String, base: String },
+
+    #[error("command inheritance cycle detected at `{name}`")]
+    CommandInheritanceCycle { name: String },
+
+    #[error("unknown profile `{name}`")]
+    UnknownProfile { name: String },
+
+    #[error("safe mode forbids shell command `{name}`")]
+    UnsafeShellCommand { name: String },
+
     #[error("invalid project root {path}")]
     InvalidProjectRoot { path: PathBuf },
 
     #[error("failed to execute command: {0}")]
     Execution(String),
+
+    #[error("failed to package project: {0}")]
+    Package(String),
 }

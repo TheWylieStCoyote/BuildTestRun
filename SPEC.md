@@ -14,6 +14,9 @@ mbr init
 mbr list
 mbr which
 mbr doctor
+mbr show <name>
+mbr --workspace <path>
+mbr parallel <name>...
 mbr fmt
 mbr clean
 mbr ci
@@ -30,17 +33,36 @@ Provide a single, predictable command interface that works across many ecosystem
 When a user runs `mbr build`, `mbr test`, `mbr run`, or `mbr exec <name>`, the CLI should:
 
 1. Find the hidden config file in the current directory or one of its parents.
-2. Parse and validate the config.
-3. Resolve the command for the requested action.
-4. Execute that command in the configured project directory.
-5. Stream stdout and stderr directly to the terminal.
-6. Exit with the same status code as the underlying command.
+2. Merge any parent `.mbr.toml` files with the nearest child overrides.
+3. Parse and validate the config.
+4. Resolve the command for the requested action.
+5. Execute that command in the configured project directory.
+6. Stream stdout and stderr directly to the terminal.
+7. Exit with the same status code as the underlying command.
 
 `mbr validate` should parse and validate the config without executing anything.
+`mbr validate --strict` should fail on missing conventional commands.
 `mbr init` should create a starter `.mbr.toml` in the current directory, with templates for common ecosystems.
+Template variants should include rust, node, pnpm, yarn, python, poetry, uv, go, cargo-workspace, cmake, cmake-ninja, and generic.
 `mbr list` should print available command names and optional descriptions.
 `mbr which` should show the resolved config path and project root.
 `mbr doctor` should report missing commands and PATH issues.
+`mbr doctor --strict` should exit non-zero when warnings exist.
+`mbr show <name>` should display the resolved command, cwd, timeout, and description.
+`mbr --workspace <path>` should resolve the project starting from the given directory.
+`mbr parallel <name>...` should run multiple named commands concurrently.
+Pipeline commands should support `steps = ["fmt", "lint", "test"]` and run each named step in order.
+`extends` on a command should inherit base fields and append arguments by default. Use `args_mode = "replace"` to replace inherited args, and `env_mode = "replace"` to replace inherited env.
+Set `MBR_PROFILE=<name>` to apply `[profiles.<name>]` overlays.
+Commands may include `windows = { ... }` and `unix = { ... }` override tables for platform-specific differences.
+`--safe` should reject shell-string commands.
+If `[project].name` is missing, execution should warn that command trust is lower.
+If a project-root `.env` file exists, its values should be loaded before execution.
+Commands may define `retries` to retry failed runs.
+`mbr workspace --list` should list discovered projects, and `mbr workspace <name>` should run a named command in each discovered project.
+`mbr package` should archive the configured project root into a local tarball or zip file.
+`mbr completions <shell>` should print a shell completion script.
+`mbr manpage` should print the command manpage to stdout.
 
 ## Config File
 
@@ -72,7 +94,11 @@ lint = { program = "cargo", args = ["clippy", "--all-targets", "--all-features",
 - `commands.test`: Command executed by `mbr test`.
 - `commands.run`: Command executed by `mbr run`.
 - `commands.<name>`: Additional named commands executed by `mbr exec <name>`.
+- `commands.<name>.steps`: Sequential named steps for pipeline commands.
+- `profiles.<name>`: Optional environment and command overlays activated by `MBR_PROFILE`.
 - `commands.fmt`, `commands.clean`, `commands.ci`: Common convenience commands.
+- `cwd`: Optional per-command working directory relative to the project root.
+- `timeout`: Optional per-command timeout in seconds.
 
 ## CLI Commands
 
