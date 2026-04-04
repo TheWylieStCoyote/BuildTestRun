@@ -430,9 +430,25 @@ fn read_template_source(path: &Path) -> Result<String, Error> {
 }
 
 fn validate_rendered_init_template(rendered: &str) -> Result<(), Error> {
-    toml::from_str::<toml::Value>(rendered).map_err(|source| Error::InitTemplateParse {
-        source: Box::new(source),
+    let parsed = toml::from_str::<config::ProjectFile>(rendered).map_err(|source| {
+        Error::InitTemplateParse {
+            source: Box::new(source),
+        }
     })?;
+
+    if parsed.commands.is_empty() {
+        return Err(Error::MissingCommandGroup);
+    }
+
+    parsed
+        .commands
+        .resolve_inheritance()
+        .map_err(|source| match source {
+            Error::ConfigParse { path, source } => Error::ConfigParse { path, source },
+            Error::UnknownCommandBase { name, base } => Error::UnknownCommandBase { name, base },
+            Error::CommandInheritanceCycle { name } => Error::CommandInheritanceCycle { name },
+            other => other,
+        })?;
     Ok(())
 }
 
@@ -443,8 +459,10 @@ fn validate_safe_rendered_init_template(rendered: &str) -> Result<(), Error> {
         }
     })?;
 
-    for name in parsed.commands.names() {
-        if let Some(command) = parsed.commands.get(&name)
+    let commands = parsed.commands.resolve_inheritance()?;
+
+    for name in commands.names() {
+        if let Some(command) = commands.get(&name)
             && command.is_shell()
         {
             return Err(Error::UnsafeInitTemplate { name });

@@ -1390,6 +1390,7 @@ root = "."
 [commands]
 build = { program = "cmake", args = ["-S", ".", "-B", "build"], description = "Configure the build" }
 test = { program = "ctest", args = ["--test-dir", "build"], description = "Run tests" }
+run = { program = "cmake", args = ["--build", "build"], description = "Build the default target" }
 fmt = { program = "cmake-format", args = ["-i", "CMakeLists.txt"], description = "Format CMake files" }
 lint = { program = "cmake", args = ["-S", ".", "-B", "build"], description = "Configure the build" }
 check = { program = "cmake", args = ["-S", ".", "-B", "build"], description = "Validate the build configuration" }
@@ -1407,6 +1408,7 @@ root = "."
 [commands]
 build = { program = "cmake", args = ["-S", ".", "-B", "build", "-G", "Ninja"], description = "Configure the build" }
 test = { program = "ctest", args = ["--test-dir", "build"], description = "Run tests" }
+run = { program = "cmake", args = ["--build", "build"], description = "Build the default target" }
 fmt = { program = "cmake-format", args = ["-i", "CMakeLists.txt"], description = "Format CMake files" }
 lint = { program = "cmake", args = ["-S", ".", "-B", "build", "-G", "Ninja"], description = "Configure the build" }
 check = { program = "cmake", args = ["-S", ".", "-B", "build", "-G", "Ninja"], description = "Validate the build configuration" }
