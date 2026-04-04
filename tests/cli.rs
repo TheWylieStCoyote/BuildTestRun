@@ -509,8 +509,55 @@ fn templates_json_has_stable_envelope() {
 
     let value: Value = serde_json::from_slice(&output).expect("json output");
     assert_eq!(value["status"], "ok");
+    assert_eq!(value["command"], "templates");
     assert_eq!(value["count"], value["templates"].as_array().unwrap().len());
     assert!(value["count"].as_u64().unwrap() > 0);
+}
+
+#[test]
+fn which_json_has_stable_envelope() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(temp.path(), "[commands]\nbuild = \"echo ok\"\n");
+
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["--json", "which"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("json output");
+    assert_eq!(value["status"], "ok");
+    assert_eq!(value["command"], "which");
+    assert!(value["config"].is_string());
+    assert!(value["root"].is_string());
+}
+
+#[test]
+fn doctor_json_has_stable_envelope() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        "[commands]\nbuild = \"echo ok\"\ntest = \"echo ok\"\nrun = \"echo ok\"\nfmt = \"echo ok\"\nclean = \"echo ok\"\nci = \"echo ok\"\n",
+    );
+
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["--json", "doctor"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("json output");
+    assert_eq!(value["status"], "warn");
+    assert_eq!(value["command"], "doctor");
+    assert!(value["warnings"].as_array().is_some());
 }
 
 #[test]

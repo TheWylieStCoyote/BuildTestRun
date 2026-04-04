@@ -90,6 +90,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Shows resolved config with `mbr which`
 - Inspects a command with `mbr show <name>` and shows source provenance
 - Explains a command with `mbr explain <name>` and shows source provenance
+- JSON output now uses a stable envelope with `status` and `command`
 - Supports `--workspace <path>` to run from a nested project root
 - Runs multiple named commands concurrently with `mbr parallel <name>...`
 - Supports pipeline commands with `steps = ["fmt", "lint", "test"]`

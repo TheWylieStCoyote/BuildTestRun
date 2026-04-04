@@ -17,7 +17,7 @@ Summarize failed commands with exit code, project name, and duration.
 5. [x] Source-aware `show` / `explain`
 Show where each resolved value came from: base config, child config, profile, or platform override.
 
-6. Consistent JSON envelopes
+6. [x] Consistent JSON envelopes
 Use stable `status`, `count`, `project`, `command`, and `warnings` fields across commands.
 
 7. More actionable `doctor`

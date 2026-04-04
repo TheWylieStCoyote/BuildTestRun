@@ -17,6 +17,16 @@ use std::{
     time::Instant,
 };
 
+fn json_envelope(command: &str, status: &str, fields: Vec<(&str, Value)>) -> Value {
+    let mut object = Map::new();
+    object.insert("status".to_string(), json!(status));
+    object.insert("command".to_string(), json!(command));
+    for (key, value) in fields {
+        object.insert(key.to_string(), value);
+    }
+    Value::Object(object)
+}
+
 pub fn run_from_args() -> Result<i32, Error> {
     let cli = Cli::parse();
     let cwd = env::current_dir()?;
@@ -154,7 +164,11 @@ pub(crate) fn workspace_action(
             .collect::<Result<Vec<_>, Error>>()?;
 
         if json_output {
-            print_stable_json(json!({"projects": entries}));
+            print_stable_json(json_envelope(
+                "workspace",
+                "ok",
+                vec![("projects", json!(entries))],
+            ));
         } else {
             for entry in entries {
                 if let Value::Object(map) = entry {
@@ -343,12 +357,15 @@ pub fn validate_action(
     let exit_code = if strict && !warnings.is_empty() { 1 } else { 0 };
 
     if json_output {
-        print_stable_json(json!({
-            "status": if warnings.is_empty() { "ok" } else { "warn" },
-            "config": config_path,
-            "project": config.name,
-            "warnings": warnings,
-        }));
+        print_stable_json(json_envelope(
+            "validate",
+            if warnings.is_empty() { "ok" } else { "warn" },
+            vec![
+                ("config", json!(config_path)),
+                ("project", json!(config.name)),
+                ("warnings", json!(warnings)),
+            ],
+        ));
     } else if !warnings.is_empty() {
         for warning in &warnings {
             eprintln!("warning: {warning}");
@@ -404,7 +421,7 @@ pub(crate) fn init_action(
     })?;
 
     if json_output {
-        print_stable_json(json!({"status": "ok", "path": path}));
+        print_stable_json(json_envelope("init", "ok", vec![("path", json!(path))]));
     } else {
         eprintln!("[mbr] wrote {}", path.display());
         for warning in template_warnings(init_spec.template) {
@@ -578,11 +595,14 @@ fn templates_action(json_output: bool, verbose: bool) -> Result<i32, Error> {
         .collect();
 
     if json_output {
-        print_stable_json(json!({
-            "status": "ok",
-            "count": entries.len(),
-            "templates": entries,
-        }));
+        print_stable_json(json_envelope(
+            "templates",
+            "ok",
+            vec![
+                ("count", json!(entries.len())),
+                ("templates", json!(entries)),
+            ],
+        ));
     } else {
         for entry in entries {
             if let Value::Object(map) = entry {
@@ -932,7 +952,14 @@ pub fn package_action(
     }
 
     if json_output {
-        print_stable_json(json!({"output": archive_path, "root": config.root}));
+        print_stable_json(json_envelope(
+            "package",
+            "ok",
+            vec![
+                ("output", json!(archive_path)),
+                ("root", json!(config.root)),
+            ],
+        ));
     } else {
         println!("package: {}", archive_path.display());
     }
@@ -1016,7 +1043,11 @@ pub fn list_action(
             .iter()
             .map(|(name, description)| json!({"name": name, "description": description}))
             .collect();
-        print_stable_json(json!({"commands": commands}));
+        print_stable_json(json_envelope(
+            "list",
+            "ok",
+            vec![("commands", json!(commands))],
+        ));
     } else {
         for (name, description) in entries {
             if verbose {
@@ -1056,10 +1087,11 @@ pub fn which_action(
     let (config_path, config) = load_project(start_dir, profile)?;
 
     if json_output {
-        print_stable_json(json!({
-            "config": config_path,
-            "root": config.root,
-        }));
+        print_stable_json(json_envelope(
+            "which",
+            "ok",
+            vec![("config", json!(config_path)), ("root", json!(config.root))],
+        ));
     } else {
         println!("config: {}", config_path.display());
         println!("root: {}", config.root.display());
@@ -1078,12 +1110,15 @@ pub fn doctor_action(
     let warnings = validation_issues(&config);
 
     if json_output {
-        print_stable_json(json!({
-            "config": config_path,
-            "root": config.root,
-            "warnings": warnings,
-            "status": if warnings.is_empty() { "ok" } else { "warn" },
-        }));
+        print_stable_json(json_envelope(
+            "doctor",
+            if warnings.is_empty() { "ok" } else { "warn" },
+            vec![
+                ("config", json!(config_path)),
+                ("root", json!(config.root)),
+                ("warnings", json!(warnings)),
+            ],
+        ));
     } else {
         println!("config: {}", config_path.display());
         println!("root: {}", config.root.display());
@@ -1140,18 +1175,22 @@ fn describe_action(
     let sources = command_sources(start_dir, &config, command)?;
 
     if json_output {
-        print_stable_json(json!({
-            "config": config_path,
-            "root": config.root,
-            "name": name,
-            "rendered": rendered,
-            "cwd": cwd,
-            "timeout": command.timeout(),
-            "description": command.description(),
-            "shell": command.is_shell(),
-            "pipeline": command.is_pipeline(),
-            "sources": sources,
-        }));
+        print_stable_json(json_envelope(
+            &name,
+            "ok",
+            vec![
+                ("config", json!(config_path)),
+                ("root", json!(config.root)),
+                ("name", json!(name)),
+                ("rendered", json!(rendered)),
+                ("cwd", json!(cwd)),
+                ("timeout", json!(command.timeout())),
+                ("description", json!(command.description())),
+                ("shell", json!(command.is_shell())),
+                ("pipeline", json!(command.is_pipeline())),
+                ("sources", json!(sources)),
+            ],
+        ));
     } else {
         println!("name: {name}");
         println!("command: {rendered}");
@@ -1225,12 +1264,15 @@ pub fn dry_run_action(
     let rendered = command.render(&args);
 
     if json_output {
-        print_stable_json(json!({
-            "config": config_path,
-            "root": config.root,
-            "command": command_name,
-            "rendered": rendered,
-        }));
+        print_stable_json(json_envelope(
+            &command_name,
+            "ok",
+            vec![
+                ("config", json!(config_path)),
+                ("root", json!(config.root)),
+                ("rendered", json!(rendered)),
+            ],
+        ));
     } else {
         println!("[mbr] dry-run: {rendered}");
     }
@@ -1259,6 +1301,7 @@ pub fn parallel_action(
                     .ok_or_else(|| Error::UnknownCommand { name: name.clone() })?;
                 enforce_safe_command(name, command, safe)?;
                 Ok(json!({
+                    "command": name,
                     "name": name,
                     "rendered": command.render(&[]),
                     "timeout": command.timeout(),
@@ -1268,7 +1311,11 @@ pub fn parallel_action(
             .collect::<Result<Vec<_>, Error>>()?;
 
         if json_output {
-            print_stable_json(json!({"parallel": commands}));
+            print_stable_json(json_envelope(
+                "dry-run",
+                "ok",
+                vec![("commands", json!(commands))],
+            ));
         } else {
             for name in names {
                 let command = config
@@ -1328,7 +1375,11 @@ pub fn parallel_action(
     }
 
     if json_output {
-        print_stable_json(json!({"parallel": names, "status": "ok"}));
+        print_stable_json(json_envelope(
+            "parallel",
+            "ok",
+            vec![("parallel", json!(names))],
+        ));
     }
 
     Ok(exit_code)
