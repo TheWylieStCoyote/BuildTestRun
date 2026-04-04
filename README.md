@@ -88,7 +88,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Starter templates include rust, node, pnpm, yarn, bun, deno, nextjs, vite, turbo, nx, python, django, fastapi, flask, poetry, hatch, pixi, uv, go, cargo-workspace, java-gradle, java-maven, kotlin-gradle, dotnet, php-composer, ruby-bundler, rails, laravel, terraform, helm, docker-compose, cmake, cmake-ninja, and generic
 - Starter templates now include short descriptions in the template catalog
 - Lists commands and descriptions with `mbr list`
-- Shows resolved config with `mbr which`
+- Shows resolved config with `mbr which`, including config chain and selected profile
 - Inspects a command with `mbr show <name>` and shows source provenance
 - Explains a command with `mbr explain <name>` and shows source provenance
 - JSON output now uses a stable envelope with `status` and `command`

@@ -26,7 +26,7 @@ Suggest likely fixes when PATH tools or env files are missing.
 8. [x] `init --print`
 Render a starter config to stdout instead of writing a file.
 
-9. Better provenance in `which`
+9. [x] Better provenance in `which`
 Show config chain and selected profile clearly.
 
 10. Template detection plus prompts

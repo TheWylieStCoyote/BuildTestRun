@@ -55,7 +55,7 @@ Rendered init templates should be validated before writing.
 `mbr list` should print available command names and optional descriptions.
 `mbr show <command>` should print the fully resolved command, cwd, env, and source provenance from base config, child config, profile, and platform override layers.
 `mbr explain <command>` should print the command type, resolution details, and the same source provenance.
-`mbr which` should show the resolved config path and project root.
+`mbr which` should show the resolved config path, project root, config chain, and selected profile.
 JSON output should use a stable envelope with `status`, `command`, and command-specific fields.
 `mbr doctor` should report missing commands and PATH issues, and suggest fixes for missing tools and env files.
 `mbr doctor --strict` should exit non-zero when warnings exist.

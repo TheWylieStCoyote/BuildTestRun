@@ -1103,16 +1103,34 @@ pub fn which_action(
     profile: Option<&str>,
 ) -> Result<i32, Error> {
     let (config_path, config) = load_project(start_dir, profile)?;
+    let config_chain = discovery::discover_config_chain(start_dir)?;
 
     if json_output {
         print_stable_json(json_envelope(
             "which",
             "ok",
-            vec![("config", json!(config_path)), ("root", json!(config.root))],
+            vec![
+                ("config", json!(config_path)),
+                ("root", json!(config.root)),
+                ("config_chain", json!(config_chain)),
+                ("selected_profile", json!(config.selected_profile)),
+            ],
         ));
     } else {
         println!("config: {}", config_path.display());
         println!("root: {}", config.root.display());
+        println!(
+            "chain: {}",
+            config_chain
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>()
+                .join(" -> ")
+        );
+        match config.selected_profile.as_deref() {
+            Some(profile) => println!("profile: {profile}"),
+            None => println!("profile: (none)"),
+        }
     }
 
     Ok(0)

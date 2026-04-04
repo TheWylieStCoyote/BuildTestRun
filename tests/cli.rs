@@ -539,11 +539,27 @@ fn templates_json_has_stable_envelope() {
 #[test]
 fn which_json_has_stable_envelope() {
     let temp = TempDir::new().expect("temp dir");
-    write_config(temp.path(), "[commands]\nbuild = \"echo ok\"\n");
+    let nested = mkdir(temp.path(), "nested");
+    write_config(
+        temp.path(),
+        r#"
+[project]
+root = "."
+
+[profiles.dev]
+[profiles.dev.commands]
+build = "echo ok"
+
+[commands]
+build = "echo ok"
+"#,
+    );
+    write_config(&nested, "[commands]\nbuild = \"echo ok\"\n");
 
     let output = Command::cargo_bin("mbr")
         .expect("binary")
-        .current_dir(temp.path())
+        .current_dir(&nested)
+        .env("MBR_PROFILE", "dev")
         .args(["--json", "which"])
         .assert()
         .success()
@@ -556,6 +572,8 @@ fn which_json_has_stable_envelope() {
     assert_eq!(value["command"], "which");
     assert!(value["config"].is_string());
     assert!(value["root"].is_string());
+    assert_eq!(value["selected_profile"], "dev");
+    assert_eq!(value["config_chain"].as_array().unwrap().len(), 2);
 }
 
 #[test]
@@ -874,6 +892,7 @@ build = { program = "cargo", args = ["build"], description = "Compile the projec
 #[test]
 fn which_reports_config_and_root() {
     let temp = TempDir::new().expect("temp dir");
+    let nested = mkdir(temp.path(), "nested");
     write_config(
         temp.path(),
         r#"
@@ -884,15 +903,18 @@ root = "."
 build = { program = "cargo", args = ["build"] }
 "#,
     );
+    write_config(&nested, "[commands]\nbuild = \"echo nested\"\n");
 
     Command::cargo_bin("mbr")
         .expect("binary")
-        .current_dir(temp.path())
+        .current_dir(&nested)
         .arg("which")
         .assert()
         .success()
         .stdout(contains("config:"))
-        .stdout(contains("root:"));
+        .stdout(contains("root:"))
+        .stdout(contains("chain:"))
+        .stdout(contains("profile: (none)"));
 }
 
 #[test]
