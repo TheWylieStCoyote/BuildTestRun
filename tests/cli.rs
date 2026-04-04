@@ -858,24 +858,40 @@ run = { program = "cargo", args = ["run"] }
 }
 
 #[test]
-fn show_prints_resolved_command_details() {
+fn show_reports_source_provenance() {
     let temp = TempDir::new().expect("temp dir");
     let nested = mkdir(temp.path(), "nested");
     write_config(
         temp.path(),
-        "[commands]\nbuild = { program = \"cargo\", args = [\"build\", \"--release\"], cwd = \"nested\", description = \"Compile the project\" }\n",
+        r#"
+[commands]
+build = { program = "cargo", args = ["build", "--release"], cwd = "nested", description = "Compile the project" }
+
+[profiles.dev]
+[profiles.dev.commands]
+build = { program = "cargo", args = ["build", "--release"], description = "Profile build", windows = { args = ["build", "--locked"] }, unix = { args = ["build", "--locked"] } }
+"#,
+    );
+    write_config(
+        &nested,
+        "[commands]\nbuild = { program = \"cargo\", args = [\"build\", \"--release\"], cwd = \"nested\", description = \"Child build\" }\n",
     );
 
     Command::cargo_bin("mbr")
         .expect("binary")
-        .current_dir(temp.path())
+        .current_dir(nested.clone())
+        .env("MBR_PROFILE", "dev")
         .args(["show", "build"])
         .assert()
         .success()
         .stdout(contains("name: build"))
-        .stdout(contains("cargo build --release"))
+        .stdout(contains("cargo build --locked"))
         .stdout(contains("cwd:"))
-        .stdout(contains("Compile the project"));
+        .stdout(contains("Profile build"))
+        .stdout(contains("source: base config:"))
+        .stdout(contains("source: child config:"))
+        .stdout(contains("source: profile: dev"))
+        .stdout(contains("source: platform override:"));
 
     assert!(nested.exists());
 }
@@ -1262,7 +1278,8 @@ ci = { steps = ["fmt", "lint"] }
         .assert()
         .success()
         .stdout(contains("type: pipeline"))
-        .stdout(contains("steps: fmt -> lint"));
+        .stdout(contains("steps: fmt -> lint"))
+        .stdout(contains("source: base config:"));
 }
 
 #[test]

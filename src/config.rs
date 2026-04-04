@@ -66,6 +66,7 @@ pub struct CommandSpec {
     extends: Option<String>,
     args_mode: ArgsMode,
     env_mode: EnvMode,
+    platform_override: Option<&'static str>,
     shell: Option<String>,
     program: Option<String>,
     steps: Vec<String>,
@@ -152,6 +153,7 @@ impl<'de> Deserialize<'de> for CommandSpec {
                     extends: None,
                     args_mode: ArgsMode::Append,
                     env_mode: EnvMode::Merge,
+                    platform_override: None,
                     shell: Some(command),
                     program: None,
                     steps: vec![],
@@ -185,6 +187,7 @@ impl<'de> Deserialize<'de> for CommandSpec {
                     extends,
                     args_mode,
                     env_mode,
+                    platform_override: None,
                     shell: command,
                     program,
                     steps,
@@ -202,10 +205,10 @@ impl<'de> Deserialize<'de> for CommandSpec {
 
         if cfg!(windows) {
             if let Some(override_spec) = windows {
-                spec.apply_override(&override_spec);
+                spec.apply_override(&override_spec, "windows");
             }
         } else if let Some(override_spec) = unix {
-            spec.apply_override(&override_spec);
+            spec.apply_override(&override_spec, "unix");
         }
 
         if spec.shell.is_none()
@@ -274,6 +277,10 @@ impl CommandSpec {
         self.extends.as_deref()
     }
 
+    pub fn platform_override(&self) -> Option<&'static str> {
+        self.platform_override
+    }
+
     pub fn steps(&self) -> &[String] {
         &self.steps
     }
@@ -294,7 +301,7 @@ impl CommandSpec {
         &self.env
     }
 
-    fn apply_override(&mut self, override_spec: &CommandOverride) {
+    fn apply_override(&mut self, override_spec: &CommandOverride, platform: &'static str) {
         if let Some(command) = &override_spec.command {
             self.shell = Some(command.clone());
             self.program = None;
@@ -344,6 +351,8 @@ impl CommandSpec {
         if let Some(description) = &override_spec.description {
             self.description = Some(description.clone());
         }
+
+        self.platform_override = Some(platform);
     }
 
     fn merge_from(&self, base: &CommandSpec) -> CommandSpec {
@@ -403,6 +412,10 @@ impl CommandSpec {
 
         if self.description.is_some() {
             merged.description = self.description.clone();
+        }
+
+        if self.platform_override.is_some() {
+            merged.platform_override = self.platform_override;
         }
 
         merged.extends = None;

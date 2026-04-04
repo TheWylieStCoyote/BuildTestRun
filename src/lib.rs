@@ -1137,6 +1137,7 @@ fn describe_action(
         .cwd()
         .map(|path| resolve_workdir(&config.root, Some(path)))
         .unwrap_or_else(|| config.root.clone());
+    let sources = command_sources(start_dir, &config, command)?;
 
     if json_output {
         print_stable_json(json!({
@@ -1149,6 +1150,7 @@ fn describe_action(
             "description": command.description(),
             "shell": command.is_shell(),
             "pipeline": command.is_pipeline(),
+            "sources": sources,
         }));
     } else {
         println!("name: {name}");
@@ -1170,9 +1172,39 @@ fn describe_action(
         if let Some(description) = command.description() {
             println!("description: {description}");
         }
+        for source in sources {
+            println!("source: {source}");
+        }
     }
 
     Ok(0)
+}
+
+fn command_sources(
+    start_dir: &Path,
+    config: &config::ProjectConfig,
+    command: &config::CommandSpec,
+) -> Result<Vec<String>, Error> {
+    let mut sources = Vec::new();
+    let config_paths = discovery::discover_config_chain(start_dir)?;
+
+    for (idx, path) in config_paths.iter().enumerate() {
+        if idx == 0 {
+            sources.push(format!("base config: {}", path.display()));
+        } else {
+            sources.push(format!("child config: {}", path.display()));
+        }
+    }
+
+    if let Some(profile) = config.selected_profile.as_deref() {
+        sources.push(format!("profile: {profile}"));
+    }
+
+    if let Some(platform) = command.platform_override() {
+        sources.push(format!("platform override: {platform}"));
+    }
+
+    Ok(sources)
 }
 
 pub fn dry_run_action(

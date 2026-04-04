@@ -52,6 +52,8 @@ Template variants should include rust, node, pnpm, yarn, bun, deno, nextjs, vite
 `mbr init --template-file <path>` should render a custom starter template from a file or a directory containing a template file.
 Rendered init templates should be validated before writing.
 `mbr list` should print available command names and optional descriptions.
+`mbr show <command>` should print the fully resolved command, cwd, env, and source provenance from base config, child config, profile, and platform override layers.
+`mbr explain <command>` should print the command type, resolution details, and the same source provenance.
 `mbr which` should show the resolved config path and project root.
 `mbr doctor` should report missing commands and PATH issues.
 `mbr doctor --strict` should exit non-zero when warnings exist.

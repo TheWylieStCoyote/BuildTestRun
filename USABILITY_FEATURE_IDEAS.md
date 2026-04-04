@@ -14,7 +14,7 @@ Prefix output with the project or command name so multi-project runs stay readab
 4. [x] Better failure summaries
 Summarize failed commands with exit code, project name, and duration.
 
-5. Source-aware `show` / `explain`
+5. [x] Source-aware `show` / `explain`
 Show where each resolved value came from: base config, child config, profile, or platform override.
 
 6. Consistent JSON envelopes
