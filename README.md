@@ -92,6 +92,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Supports `--workspace <path>` to run from a nested project root
 - Runs multiple named commands concurrently with `mbr parallel <name>...`
 - Supports pipeline commands with `steps = ["fmt", "lint", "test"]`
+- Prefixes workspace and parallel output with the project or command name
 - Checks for missing commands and PATH issues with `mbr doctor`
 - Supports `--dry-run` for execution commands
 - Supports per-command `cwd` and `timeout`

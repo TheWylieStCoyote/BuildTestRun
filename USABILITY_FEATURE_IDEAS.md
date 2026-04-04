@@ -8,7 +8,7 @@ Detect Rust, Node, Python, and CMake projects automatically from files like `Car
 2. [x] `workspace --changed-only`
 Only run commands for projects touched in the current git diff.
 
-3. Prefixed workspace and parallel output
+3. [x] Prefixed workspace and parallel output
 Prefix output with the project or command name so multi-project runs stay readable.
 
 4. Better failure summaries

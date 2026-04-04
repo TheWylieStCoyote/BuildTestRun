@@ -5,13 +5,19 @@ use crate::{
 };
 use std::{
     borrow::Cow,
+    io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
     process::{Command, ExitStatus, Stdio},
     thread,
     time::{Duration, Instant},
 };
 
-pub fn execute(action: Action, config: &ProjectConfig, safe: bool) -> Result<ExitStatus, Error> {
+pub fn execute(
+    action: Action,
+    config: &ProjectConfig,
+    safe: bool,
+    prefix: Option<&str>,
+) -> Result<ExitStatus, Error> {
     let (command_name, args, action_label) = match action {
         Action::Build(CommandArgs { args }) => ("build".to_string(), args, "build".to_string()),
         Action::Test(CommandArgs { args }) => ("test".to_string(), args, "test".to_string()),
@@ -42,7 +48,7 @@ pub fn execute(action: Action, config: &ProjectConfig, safe: bool) -> Result<Exi
         eprintln!("[mbr] warning: project name is not set; command trust is lower");
     }
 
-    run_named_command(&command_name, &args, &action_label, config, safe)
+    run_named_command(&command_name, &args, &action_label, config, safe, prefix)
 }
 
 fn unknown_command_error(name: &str) -> Error {
@@ -80,6 +86,7 @@ fn run_named_command(
     action_label: &str,
     config: &ProjectConfig,
     safe: bool,
+    prefix: Option<&str>,
 ) -> Result<ExitStatus, Error> {
     let command = config
         .commands
@@ -105,7 +112,7 @@ fn run_named_command(
 
         let mut last_status = None;
         for step in command.steps() {
-            last_status = Some(run_named_command(step, &[], step, config, safe)?);
+            last_status = Some(run_named_command(step, &[], step, config, safe, prefix)?);
         }
 
         return Ok(last_status.expect("pipeline commands must have at least one step"));
@@ -115,7 +122,7 @@ fn run_named_command(
     let mut attempt = 0;
 
     loop {
-        let result = run_command_once(command, args, &config.root, &config.env);
+        let result = run_command_once(command, args, &config.root, &config.env, prefix);
         match result {
             Ok(status) if status.success() => return Ok(status),
             Ok(_) if attempt < retries => {
@@ -137,12 +144,18 @@ fn run_command_once(
     extra_args: &[String],
     root: &Path,
     project_env: &std::collections::HashMap<String, String>,
+    prefix: Option<&str>,
 ) -> Result<ExitStatus, Error> {
     let mut cmd = build_command(command, extra_args);
     cmd.current_dir(resolve_workdir(root, command.cwd()));
     cmd.stdin(Stdio::inherit());
-    cmd.stdout(Stdio::inherit());
-    cmd.stderr(Stdio::inherit());
+    if prefix.is_some() {
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
+    } else {
+        cmd.stdout(Stdio::inherit());
+        cmd.stderr(Stdio::inherit());
+    }
 
     for (key, value) in project_env {
         cmd.env(key, value);
@@ -152,12 +165,56 @@ fn run_command_once(
         .spawn()
         .map_err(|source| Error::Execution(source.to_string()))?;
 
+    if let Some(prefix) = prefix {
+        let stdout = child.stdout.take();
+        let stderr = child.stderr.take();
+        let stdout_thread =
+            stdout.map(|stream| spawn_prefixed_reader(stream, prefix.to_string(), false));
+        let stderr_thread =
+            stderr.map(|stream| spawn_prefixed_reader(stream, prefix.to_string(), true));
+
+        let status = match command.timeout() {
+            Some(timeout_secs) => wait_with_timeout(&mut child, Duration::from_secs(timeout_secs)),
+            None => child
+                .wait()
+                .map_err(|source| Error::Execution(source.to_string())),
+        };
+
+        if let Some(handle) = stdout_thread {
+            let _ = handle.join();
+        }
+        if let Some(handle) = stderr_thread {
+            let _ = handle.join();
+        }
+
+        return status;
+    }
+
     match command.timeout() {
         Some(timeout_secs) => wait_with_timeout(&mut child, Duration::from_secs(timeout_secs)),
         None => child
             .wait()
             .map_err(|source| Error::Execution(source.to_string())),
     }
+}
+
+fn spawn_prefixed_reader<R: std::io::Read + Send + 'static>(
+    reader: R,
+    prefix: String,
+    is_err: bool,
+) -> thread::JoinHandle<()> {
+    thread::spawn(move || {
+        let reader = BufReader::new(reader);
+        for line in reader.lines().map_while(Result::ok) {
+            if is_err {
+                let mut handle = std::io::stderr().lock();
+                let _ = writeln!(handle, "[{prefix}] {line}");
+            } else {
+                let mut handle = std::io::stdout().lock();
+                let _ = writeln!(handle, "[{prefix}] {line}");
+            }
+        }
+    })
 }
 
 fn build_command(command: &CommandSpec, extra_args: &[String]) -> Command {

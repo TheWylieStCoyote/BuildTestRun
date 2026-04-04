@@ -959,7 +959,10 @@ fn parallel_runs_commands_concurrently() {
         .current_dir(temp.path())
         .args(["parallel", "one", "two", "three"])
         .assert()
-        .success();
+        .success()
+        .stdout(contains("[one] one"))
+        .stdout(contains("[two] two"))
+        .stdout(contains("[three] three"));
 
     assert!(start.elapsed() < std::time::Duration::from_secs(5));
 }
@@ -1391,7 +1394,7 @@ fn workspace_filters_projects_by_changed_files() {
         .args(["workspace", "--changed-only", "build"])
         .assert()
         .success()
-        .stdout(contains("second-changed"))
+        .stdout(contains("[second] second-changed"))
         .stdout(predicates::str::contains("first-ok").not());
 }
 
@@ -1421,7 +1424,7 @@ fn workspace_runs_command_in_named_projects_only() {
         .args(["workspace", "--name", "first", "build"])
         .assert()
         .success()
-        .stdout(contains("first-ok"))
+        .stdout(contains("[first] first-ok"))
         .stdout(predicates::str::contains("second-ok").not());
 }
 
@@ -1451,8 +1454,8 @@ fn workspace_runs_command_in_each_project() {
         .args(["workspace", "build"])
         .assert()
         .success()
-        .stdout(contains("first-ok"))
-        .stdout(contains("second-ok"));
+        .stdout(contains("[first] first-ok"))
+        .stdout(contains("[second] second-ok"));
 }
 
 #[test]

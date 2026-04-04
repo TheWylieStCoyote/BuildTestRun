@@ -109,7 +109,7 @@ pub fn run_action(
     profile: Option<&str>,
 ) -> Result<i32, Error> {
     let (_, config) = load_project(start_dir, profile)?;
-    let status = runner::execute(action, &config, safe)?;
+    let status = runner::execute(action, &config, safe, None)?;
     Ok(status.code().unwrap_or(1))
 }
 
@@ -173,7 +173,12 @@ pub(crate) fn workspace_action(
     let mut exit_code = 0;
     for (_, config) in projects {
         if !json_output {
-            println!("[mbr] workspace: {}", config.root.display());
+            let prefix = config
+                .name
+                .as_deref()
+                .map(|name| format!("[{name}]"))
+                .unwrap_or_else(|| format!("[{}]", config.root.display()));
+            println!("{prefix} workspace: {}", config.root.display());
         }
         match runner::execute(
             Action::Exec(cli::ExecArgs {
@@ -182,6 +187,7 @@ pub(crate) fn workspace_action(
             }),
             &config,
             safe,
+            config.name.as_deref(),
         ) {
             Ok(status) => {
                 if !status.success() {
@@ -929,7 +935,7 @@ pub fn release_action(
         Action::Build(cli::CommandArgs { args: vec![] }),
         Action::Test(cli::CommandArgs { args: vec![] }),
     ] {
-        let status = runner::execute(action, &config, false)?;
+        let status = runner::execute(action, &config, false, None)?;
         if !status.success() {
             return Ok(status.code().unwrap_or(1));
         }
@@ -1223,6 +1229,7 @@ pub fn parallel_action(
     let mut handles = Vec::new();
     for name in names.clone() {
         let config = config.clone();
+        let label = name.clone();
         handles.push(thread::spawn(move || {
             runner::execute(
                 Action::Exec(cli::ExecArgs {
@@ -1231,6 +1238,7 @@ pub fn parallel_action(
                 }),
                 &config,
                 safe,
+                Some(label.as_str()),
             )
         }));
     }
