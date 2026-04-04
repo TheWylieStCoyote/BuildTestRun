@@ -13,6 +13,8 @@ pub struct ProjectFile {
     #[serde(default)]
     pub env: HashMap<String, String>,
     #[serde(default)]
+    pub env_file: Option<String>,
+    #[serde(default)]
     pub profiles: HashMap<String, ProfileSection>,
     #[serde(default)]
     pub commands: CommandsSection,
@@ -28,6 +30,8 @@ pub struct ProjectSection {
 pub struct ProfileSection {
     #[serde(default)]
     pub env: HashMap<String, String>,
+    #[serde(default)]
+    pub env_file: Option<String>,
     #[serde(default)]
     pub commands: CommandsSection,
 }
@@ -411,6 +415,9 @@ pub struct ProjectConfig {
     pub name: Option<String>,
     pub root: PathBuf,
     pub env: HashMap<String, String>,
+    pub env_file: Option<String>,
+    pub selected_profile: Option<String>,
+    pub profile_env_file: Option<String>,
     pub commands: CommandsSection,
 }
 
@@ -421,13 +428,24 @@ impl ProjectConfig {
         Self::from_file(file, path)
     }
 
+    #[allow(dead_code)]
     pub fn load_inherited(start: &Path) -> Result<Self, Error> {
+        Self::load_inherited_with_profile(start, None)
+    }
+
+    pub fn load_inherited_with_profile(
+        start: &Path,
+        selected_profile: Option<&str>,
+    ) -> Result<Self, Error> {
         let config_paths = discovery::discover_config_chain(start)?;
         let mut name = None;
         let mut root: Option<PathBuf> = None;
         let mut env = HashMap::new();
         let mut commands = CommandsSection::default();
         let mut profiles: HashMap<String, ProfileSection> = HashMap::new();
+        let mut env_file: Option<String> = None;
+        let profile_name = selected_profile_name(selected_profile);
+        let selected_profile_name = profile_name.clone();
 
         for path in config_paths {
             let file = load_file(&path)?;
@@ -448,11 +466,14 @@ impl ProjectConfig {
             }
 
             env.extend(file.env);
+            if file.env_file.is_some() {
+                env_file = file.env_file;
+            }
             merge_profiles(&mut profiles, file.profiles);
             commands.merge_from(file.commands);
         }
 
-        apply_selected_profile(&mut env, &mut commands, &profiles)?;
+        apply_selected_profile(&mut env, &mut commands, &profiles, selected_profile)?;
 
         commands = commands.resolve_inheritance()?;
 
@@ -464,7 +485,12 @@ impl ProjectConfig {
             return Err(Error::InvalidProjectRoot { path: root });
         }
 
-        load_env_file(&root, &mut env)?;
+        load_env_file(&root, env_file.as_deref(), &mut env)?;
+        if let Some(profile_name) = profile_name.as_deref()
+            && let Some(profile) = profiles.get(profile_name)
+        {
+            load_env_file(&root, profile.env_file.as_deref(), &mut env)?;
+        }
 
         if commands.is_empty() {
             return Err(Error::MissingCommandGroup);
@@ -474,6 +500,12 @@ impl ProjectConfig {
             name,
             root,
             env,
+            env_file,
+            selected_profile: selected_profile_name,
+            profile_env_file: profile_name
+                .as_deref()
+                .and_then(|name| profiles.get(name))
+                .and_then(|profile| profile.env_file.clone()),
             commands,
         })
     }
@@ -496,18 +528,31 @@ impl ProjectConfig {
         }
 
         let mut env = file.env;
-        load_env_file(&root, &mut env)?;
+        load_env_file(&root, file.env_file.as_deref(), &mut env)?;
 
         if file.commands.is_empty() {
             return Err(Error::MissingCommandGroup);
         }
         let mut commands = file.commands;
-        apply_selected_profile(&mut env, &mut commands, &file.profiles)?;
+        let profile_name = selected_profile_name(None);
+        let selected_profile_name = profile_name.clone();
+        apply_selected_profile(&mut env, &mut commands, &file.profiles, None)?;
+        if let Some(profile_name) = profile_name.as_deref()
+            && let Some(profile) = file.profiles.get(profile_name)
+        {
+            load_env_file(&root, profile.env_file.as_deref(), &mut env)?;
+        }
 
         Ok(Self {
             name: project.name,
             root,
             env,
+            env_file: file.env_file,
+            selected_profile: selected_profile_name,
+            profile_env_file: profile_name
+                .as_deref()
+                .and_then(|name| file.profiles.get(name))
+                .and_then(|profile| profile.env_file.clone()),
             commands: commands.resolve_inheritance()?,
         })
     }
@@ -533,8 +578,12 @@ fn resolve_root(project_dir: &Path, root: &str) -> PathBuf {
     }
 }
 
-fn load_env_file(root: &Path, env: &mut HashMap<String, String>) -> Result<(), Error> {
-    let path = root.join(".env");
+fn load_env_file(
+    root: &Path,
+    env_file: Option<&str>,
+    env: &mut HashMap<String, String>,
+) -> Result<(), Error> {
+    let path = root.join(env_file.unwrap_or(".env"));
     let contents = match fs::read_to_string(&path) {
         Ok(contents) => contents,
         Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(()),
@@ -560,6 +609,14 @@ fn load_env_file(root: &Path, env: &mut HashMap<String, String>) -> Result<(), E
     }
 
     Ok(())
+}
+
+fn selected_profile_name(selected_profile: Option<&str>) -> Option<String> {
+    selected_profile.map(|value| value.to_string()).or_else(|| {
+        std::env::var("MBR_PROFILE")
+            .ok()
+            .filter(|value| !value.is_empty())
+    })
 }
 
 fn parse_env_value(value: &str) -> String {
@@ -593,13 +650,20 @@ fn apply_selected_profile(
     env: &mut HashMap<String, String>,
     commands: &mut CommandsSection,
     profiles: &HashMap<String, ProfileSection>,
+    selected_profile: Option<&str>,
 ) -> Result<(), Error> {
-    let Some(profile_name) = std::env::var("MBR_PROFILE")
-        .ok()
-        .filter(|value| !value.is_empty())
-    else {
+    let profile_name = selected_profile
+        .map(|value| value.to_string())
+        .or_else(|| {
+            std::env::var("MBR_PROFILE")
+                .ok()
+                .filter(|value| !value.is_empty())
+        })
+        .unwrap_or_default();
+
+    if profile_name.is_empty() {
         return Ok(());
-    };
+    }
 
     let Some(profile) = profiles.get(&profile_name) else {
         return Err(Error::UnknownProfile { name: profile_name });
@@ -783,6 +847,45 @@ pub fn template_spec(template: InitTemplate) -> &'static TemplateSpec {
         InitTemplate::Cmake => &TEMPLATE_CMAKE,
         InitTemplate::CmakeNinja => &TEMPLATE_CMAKE_NINJA,
         InitTemplate::Generic => &TEMPLATE_GENERIC,
+    }
+}
+
+pub fn template_description(template: InitTemplate) -> &'static str {
+    match template {
+        InitTemplate::Rust => "Rust projects with cargo build/test/run/fmt/ci commands",
+        InitTemplate::Node => "Node projects using npm scripts for common tasks",
+        InitTemplate::Pnpm => "pnpm projects using package.json scripts",
+        InitTemplate::Yarn => "Yarn projects using package.json scripts",
+        InitTemplate::Bun => "Bun projects using package.json scripts",
+        InitTemplate::Deno => "Deno projects using tasks and entrypoints",
+        InitTemplate::Nextjs => "Next.js apps with standard npm scripts",
+        InitTemplate::Vite => "Vite apps with standard npm scripts",
+        InitTemplate::Turbo => "Turborepo workspaces with shared scripts",
+        InitTemplate::Nx => "Nx workspaces with task targets",
+        InitTemplate::Python => "Python projects using basic tooling commands",
+        InitTemplate::Django => "Django projects with manage.py and test commands",
+        InitTemplate::Fastapi => "FastAPI apps with uvicorn and Python tooling",
+        InitTemplate::Flask => "Flask apps with debug run commands",
+        InitTemplate::Poetry => "Poetry-managed Python projects",
+        InitTemplate::Hatch => "Hatch-managed Python projects",
+        InitTemplate::Pixi => "Pixi projects using task-oriented commands",
+        InitTemplate::Uv => "uv-managed Python projects",
+        InitTemplate::Go => "Go projects with build/test/run commands",
+        InitTemplate::CargoWorkspace => "Rust workspaces with workspace-wide commands",
+        InitTemplate::JavaGradle => "Java projects using Gradle wrappers",
+        InitTemplate::JavaMaven => "Java projects using Maven and exec plugins",
+        InitTemplate::KotlinGradle => "Kotlin projects using Gradle wrappers",
+        InitTemplate::Dotnet => ".NET projects using dotnet CLI workflows",
+        InitTemplate::PhpComposer => "PHP projects using Composer scripts",
+        InitTemplate::RubyBundler => "Ruby projects using Bundler and Rake",
+        InitTemplate::Rails => "Rails apps with bin/rails workflows",
+        InitTemplate::Laravel => "Laravel apps with artisan workflows",
+        InitTemplate::Terraform => "Terraform projects with reviewable infrastructure commands",
+        InitTemplate::Helm => "Helm charts with packaging and linting commands",
+        InitTemplate::DockerCompose => "Docker Compose stacks with build and up commands",
+        InitTemplate::Cmake => "CMake projects with build and test commands",
+        InitTemplate::CmakeNinja => "CMake + Ninja projects with fast builds",
+        InitTemplate::Generic => "A simple starter that you can customize",
     }
 }
 

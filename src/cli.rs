@@ -6,6 +6,7 @@ pub enum Action {
     Build(CommandArgs),
     Test(CommandArgs),
     Run(CommandArgs),
+    Dev(CommandArgs),
     Fmt(CommandArgs),
     Clean(CommandArgs),
     Ci(CommandArgs),
@@ -13,8 +14,10 @@ pub enum Action {
     Parallel(ParallelArgs),
     Validate(ValidateArgs),
     Init(InitArgs),
+    Templates(TemplatesArgs),
     Workspace(WorkspaceArgs),
     Package(PackageArgs),
+    Release(ReleaseArgs),
     Completions(CompletionsArgs),
     Manpage,
     List(ListArgs),
@@ -68,6 +71,7 @@ impl fmt::Display for Action {
             Action::Build(_) => f.write_str("build"),
             Action::Test(_) => f.write_str("test"),
             Action::Run(_) => f.write_str("run"),
+            Action::Dev(_) => f.write_str("dev"),
             Action::Fmt(_) => f.write_str("fmt"),
             Action::Clean(_) => f.write_str("clean"),
             Action::Ci(_) => f.write_str("ci"),
@@ -75,8 +79,10 @@ impl fmt::Display for Action {
             Action::Parallel(_) => f.write_str("parallel"),
             Action::Validate(_) => f.write_str("validate"),
             Action::Init(_) => f.write_str("init"),
+            Action::Templates(_) => f.write_str("templates"),
             Action::Workspace(_) => f.write_str("workspace"),
             Action::Package(_) => f.write_str("package"),
+            Action::Release(_) => f.write_str("release"),
             Action::Completions(_) => f.write_str("completions"),
             Action::Manpage => f.write_str("manpage"),
             Action::List(_) => f.write_str("list"),
@@ -119,8 +125,17 @@ pub struct InitArgs {
     #[arg(long)]
     pub interactive: bool,
 
+    #[arg(long)]
+    pub list_templates: bool,
+
     #[arg(long, value_name = "PATH")]
     pub template_file: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Args)]
+pub struct TemplatesArgs {
+    #[arg(long)]
+    pub verbose: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Args)]
@@ -128,7 +143,10 @@ pub struct WorkspaceArgs {
     #[arg(long)]
     pub list: bool,
 
+    #[arg(long, value_name = "NAME")]
     pub name: Option<String>,
+
+    pub command: Option<String>,
 
     #[arg(value_name = "ARGS", last = true, allow_hyphen_values = true)]
     pub args: Vec<String>,
@@ -136,6 +154,12 @@ pub struct WorkspaceArgs {
 
 #[derive(Debug, Clone, PartialEq, Eq, Args)]
 pub struct PackageArgs {
+    #[arg(long)]
+    pub output: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Args)]
+pub struct ReleaseArgs {
     #[arg(long)]
     pub output: Option<PathBuf>,
 }
@@ -195,6 +219,9 @@ pub struct Cli {
 
     #[arg(long)]
     pub json: bool,
+
+    #[arg(long, value_name = "NAME")]
+    pub profile: Option<String>,
 
     #[arg(long, value_name = "PATH")]
     pub workspace: Option<PathBuf>,

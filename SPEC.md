@@ -11,6 +11,7 @@ mbr run
 mbr exec <name>
 mbr validate
 mbr init
+mbr templates
 mbr list
 mbr which
 mbr doctor
@@ -41,11 +42,12 @@ When a user runs `mbr build`, `mbr test`, `mbr run`, or `mbr exec <name>`, the C
 7. Exit with the same status code as the underlying command.
 
 `mbr validate` should parse and validate the config without executing anything.
-`mbr validate --strict` should fail on missing conventional commands.
+`mbr validate --strict` should fail on missing conventional commands, missing tools, missing env files, and placeholder `run` commands.
 `mbr init` should create a starter `.mbr.toml` in the current directory, with templates for common ecosystems.
 Template variants should include rust, node, pnpm, yarn, bun, deno, nextjs, vite, turbo, nx, python, django, fastapi, flask, poetry, hatch, pixi, uv, go, cargo-workspace, java-gradle, java-maven, kotlin-gradle, dotnet, php-composer, ruby-bundler, rails, laravel, terraform, helm, docker-compose, cmake, cmake-ninja, and generic.
 `mbr init --interactive` should prompt for project name, root, and template.
-`mbr init --interactive` may also prompt for optional command stubs and safe structured-only mode.
+`mbr init --interactive` may also prompt for template-specific optional commands and safe structured-only mode.
+`mbr init --list-templates` and `mbr templates` should list starter templates with descriptions.
 `mbr init --template-file <path>` should render a custom starter template from a file or a directory containing a template file.
 Rendered init templates should be validated before writing.
 `mbr list` should print available command names and optional descriptions.
@@ -58,15 +60,19 @@ Rendered init templates should be validated before writing.
 Pipeline commands should support `steps = ["fmt", "lint", "test"]` and run each named step in order.
 `extends` on a command should inherit base fields and append arguments by default. Use `args_mode = "replace"` to replace inherited args, and `env_mode = "replace"` to replace inherited env.
 Set `MBR_PROFILE=<name>` to apply `[profiles.<name>]` overlays.
+`--profile <name>` should select a profile explicitly and override `MBR_PROFILE`.
+`env_file = ".env.ci"` should load named environment files from the project root.
 Commands may include `windows = { ... }` and `unix = { ... }` override tables for platform-specific differences.
 `--safe` should reject shell-string commands.
 If `[project].name` is missing, execution should warn that command trust is lower.
 If a project-root `.env` file exists, its values should be loaded before execution.
 Commands may define `retries` to retry failed runs.
-`mbr workspace --list` should list discovered projects, and `mbr workspace <name>` should run a named command in each discovered project.
+`mbr workspace --list` should list discovered projects, `mbr workspace --name <project> --list` should filter by project name, and `mbr workspace --name <project> <name>` should run a named command in each matching discovered project.
 `mbr package` should archive the configured project root into a local tarball or zip file.
+`mbr release` should run build and test before creating a package archive.
 `mbr completions <shell>` should print a shell completion script.
 `mbr manpage` should print the command manpage to stdout.
+`install.sh` should be able to write generated completions and the manpage into user-supplied directories.
 
 ## Config File
 

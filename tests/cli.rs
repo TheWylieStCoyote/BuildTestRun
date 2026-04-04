@@ -1,5 +1,7 @@
 use assert_cmd::Command;
+use predicates::prelude::PredicateBooleanExt;
 use predicates::str::contains;
+use serde_json::Value;
 use std::{fs, path::Path};
 use tempfile::TempDir;
 
@@ -136,6 +138,23 @@ fn build_runs_configured_command() {
         .assert()
         .success()
         .stdout(contains("build-ok"));
+}
+
+#[test]
+fn dev_runs_configured_command() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        &format!("[commands]\ndev = {}\n", print_command_spec("dev-ok")),
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .arg("dev")
+        .assert()
+        .success()
+        .stdout(contains("dev-ok"));
 }
 
 #[test]
@@ -283,6 +302,34 @@ build = { program = "cargo", args = ["build"] }
 }
 
 #[test]
+fn validate_strict_reports_deeper_issues() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+env_file = ".env.missing"
+
+[project]
+name = "demo"
+
+[commands]
+build = { program = "definitely-not-on-path-12345" }
+run = "echo run"
+"#,
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["validate", "--strict"])
+        .assert()
+        .failure()
+        .stderr(contains("env file `.env.missing` was not found"))
+        .stderr(contains("was not found on PATH"))
+        .stderr(contains("placeholder"));
+}
+
+#[test]
 fn init_writes_starter_config() {
     let temp = TempDir::new().expect("temp dir");
 
@@ -366,6 +413,95 @@ fn init_supports_extended_template_catalog() {
 }
 
 #[test]
+fn templates_match_snapshot() {
+    let temp = TempDir::new().expect("temp dir");
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .arg("templates")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let actual = String::from_utf8(output).expect("utf8 output");
+    let expected = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/TEMPLATE_CATALOG.txt"));
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn templates_json_has_stable_envelope() {
+    let temp = TempDir::new().expect("temp dir");
+
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["--json", "templates"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("json output");
+    assert_eq!(value["status"], "ok");
+    assert_eq!(value["count"], value["templates"].as_array().unwrap().len());
+    assert!(value["count"].as_u64().unwrap() > 0);
+}
+
+#[test]
+fn init_list_templates_prints_catalog_without_writing() {
+    let temp = TempDir::new().expect("temp dir");
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["init", "--list-templates"])
+        .assert()
+        .success()
+        .stdout(contains("rust - Rust projects"));
+
+    assert!(!temp.path().join(".mbr.toml").exists());
+}
+
+#[test]
+fn all_templates_render_valid_configs() {
+    let temp = TempDir::new().expect("temp dir");
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .arg("templates")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let catalog = String::from_utf8(output).expect("utf8 output");
+
+    for line in catalog.lines() {
+        let Some((name, _description)) = line.split_once(" - ") else {
+            continue;
+        };
+
+        let template_dir = TempDir::new().expect("template dir");
+        Command::cargo_bin("mbr")
+            .expect("binary")
+            .current_dir(template_dir.path())
+            .args(["init", "--template", name])
+            .assert()
+            .success();
+
+        Command::cargo_bin("mbr")
+            .expect("binary")
+            .current_dir(template_dir.path())
+            .arg("validate")
+            .assert()
+            .success();
+    }
+}
+
+#[test]
 fn init_supports_interactive_prompts() {
     let temp = TempDir::new().expect("temp dir");
 
@@ -381,6 +517,29 @@ fn init_supports_interactive_prompts() {
     assert!(contents.contains("name = \"demo\""));
     assert!(contents.contains("root = \"app\""));
     assert!(contents.contains("program = \"npm\""));
+}
+
+#[test]
+fn init_interactive_prompts_are_template_specific() {
+    let temp = TempDir::new().expect("temp dir");
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["init", "--interactive"])
+        .write_stdin(
+            "demo
+.
+rust
+n
+",
+        )
+        .assert()
+        .success();
+
+    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    assert!(contents.contains("docs = { program = \"cargo\", args = [\"doc\"]"));
+    assert!(contents.contains("lint = { program = \"cargo\", args = [\"clippy\""));
 }
 
 #[test]
@@ -908,6 +1067,73 @@ fn profile_overrides_commands_and_env() {
 }
 
 #[test]
+fn profile_flag_overrides_environment() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        &format!(
+            "[commands]\nbuild = {}\n\n[profiles.dev]\n[profiles.dev.commands]\nbuild = {}\n\n[profiles.ci]\n[profiles.ci.commands]\nbuild = {}\n",
+            print_command_spec("base-ok"),
+            print_command_spec("dev-ok"),
+            print_command_spec("ci-ok")
+        ),
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .env("MBR_PROFILE", "dev")
+        .current_dir(temp.path())
+        .args(["--profile", "ci", "build"])
+        .assert()
+        .success()
+        .stdout(contains("ci-ok"));
+}
+
+#[test]
+fn project_env_file_is_loaded() {
+    let temp = TempDir::new().expect("temp dir");
+    fs::write(temp.path().join(".env.ci"), "FROM_FILE=file-value\n").expect("write env file");
+    write_config(
+        temp.path(),
+        &format!(
+            "env_file = \".env.ci\"\n[commands]\nbuild = {}\n",
+            single_env_command_spec("FROM_FILE")
+        ),
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .arg("build")
+        .assert()
+        .success()
+        .stdout(contains("file-value"));
+}
+
+#[test]
+fn profile_env_file_is_loaded() {
+    let temp = TempDir::new().expect("temp dir");
+    fs::write(temp.path().join(".env.ci"), "FROM_PROFILE=file-value\n").expect("write env file");
+    write_config(
+        temp.path(),
+        &format!(
+            "[commands]\nbuild = {}\n\n[profiles.ci]\nenv_file = \".env.ci\"\n[profiles.ci.commands]\nbuild = {}\n",
+            single_env_command_spec("FROM_PROFILE"),
+            single_env_command_spec("FROM_PROFILE")
+        ),
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .env("MBR_PROFILE", "ci")
+        .current_dir(temp.path())
+        .arg("build")
+        .assert()
+        .success()
+        .stdout(contains("file-value"));
+}
+
+#[test]
 fn list_verbose_prints_command_details() {
     let temp = TempDir::new().expect("temp dir");
     write_config(
@@ -1034,6 +1260,66 @@ fn workspace_lists_discovered_projects() {
 }
 
 #[test]
+fn workspace_filters_projects_by_name() {
+    let temp = TempDir::new().expect("temp dir");
+    let first = mkdir(temp.path(), "first");
+    let second = mkdir(temp.path(), "second");
+    write_config(
+        &first,
+        &format!(
+            "[project]\nname = \"first\"\n[commands]\nbuild = {}\n",
+            print_command_spec("first-ok")
+        ),
+    );
+    write_config(
+        &second,
+        &format!(
+            "[project]\nname = \"second\"\n[commands]\nbuild = {}\n",
+            print_command_spec("second-ok")
+        ),
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["workspace", "--name", "first", "--list"])
+        .assert()
+        .success()
+        .stdout(contains("name: first"))
+        .stdout(predicates::str::contains("name: second").not());
+}
+
+#[test]
+fn workspace_runs_command_in_named_projects_only() {
+    let temp = TempDir::new().expect("temp dir");
+    let first = mkdir(temp.path(), "first");
+    let second = mkdir(temp.path(), "second");
+    write_config(
+        &first,
+        &format!(
+            "[project]\nname = \"first\"\n[commands]\nbuild = {}\n",
+            print_command_spec("first-ok")
+        ),
+    );
+    write_config(
+        &second,
+        &format!(
+            "[project]\nname = \"second\"\n[commands]\nbuild = {}\n",
+            print_command_spec("second-ok")
+        ),
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["workspace", "--name", "first", "build"])
+        .assert()
+        .success()
+        .stdout(contains("first-ok"))
+        .stdout(predicates::str::contains("second-ok").not());
+}
+
+#[test]
 fn workspace_runs_command_in_each_project() {
     let temp = TempDir::new().expect("temp dir");
     let first = mkdir(temp.path(), "first");
@@ -1090,6 +1376,36 @@ fn package_creates_an_archive() {
     assert!(output.exists());
     assert!(archive_contains_file(&output, "README.txt"));
     assert!(archive_contains_file(&output, ".mbr.toml"));
+}
+
+#[test]
+fn release_runs_build_test_and_packages() {
+    let temp = TempDir::new().expect("temp dir");
+    fs::write(temp.path().join("README.txt"), "hello").expect("write file");
+    write_config(
+        temp.path(),
+        &format!(
+            "[project]\nname = \"demo\"\n[commands]\nbuild = {}\ntest = {}\n",
+            print_command_spec("build-ok"),
+            print_command_spec("test-ok")
+        ),
+    );
+    let output = temp.path().join(if cfg!(windows) {
+        "demo.zip"
+    } else {
+        "demo.tar.gz"
+    });
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["release", "--output", output.to_string_lossy().as_ref()])
+        .assert()
+        .success()
+        .stdout(contains("build-ok"))
+        .stdout(contains("test-ok"));
+
+    assert!(output.exists());
 }
 
 #[test]

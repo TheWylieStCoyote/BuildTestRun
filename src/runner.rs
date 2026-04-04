@@ -16,14 +16,17 @@ pub fn execute(action: Action, config: &ProjectConfig, safe: bool) -> Result<Exi
         Action::Build(CommandArgs { args }) => ("build".to_string(), args, "build".to_string()),
         Action::Test(CommandArgs { args }) => ("test".to_string(), args, "test".to_string()),
         Action::Run(CommandArgs { args }) => ("run".to_string(), args, "run".to_string()),
+        Action::Dev(CommandArgs { args }) => ("dev".to_string(), args, "dev".to_string()),
         Action::Fmt(CommandArgs { args }) => ("fmt".to_string(), args, "fmt".to_string()),
         Action::Clean(CommandArgs { args }) => ("clean".to_string(), args, "clean".to_string()),
         Action::Ci(CommandArgs { args }) => ("ci".to_string(), args, "ci".to_string()),
         Action::Exec(ExecArgs { name, args }) => (name.clone(), args, name),
         Action::Validate(_)
         | Action::Init(_)
+        | Action::Templates(_)
         | Action::Workspace(_)
         | Action::Package(_)
+        | Action::Release(_)
         | Action::Completions(_)
         | Action::Manpage
         | Action::List(_)
@@ -52,6 +55,9 @@ fn unknown_command_error(name: &str) -> Error {
         },
         "run" => Error::MissingCommand {
             action: Action::Run(CommandArgs { args: vec![] }),
+        },
+        "dev" => Error::MissingCommand {
+            action: Action::Dev(CommandArgs { args: vec![] }),
         },
         "fmt" => Error::MissingCommand {
             action: Action::Fmt(CommandArgs { args: vec![] }),

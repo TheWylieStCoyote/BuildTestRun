@@ -7,9 +7,11 @@ install_root=
 debug_flag=
 force_flag=
 lock_flag=--locked
+completions_dir=
+manpage_dir=
 
 show_help() {
-    printf '%s\n' 'Usage: ./install.sh [--root DIR] [--debug] [--force] [--no-lock] [--check]'
+    printf '%s\n' 'Usage: ./install.sh [--root DIR] [--debug] [--force] [--no-lock] [--check] [--install-completions DIR] [--install-manpage DIR]'
     printf '%s\n' ''
     printf '%s\n' 'Options:'
     printf '%s\n' '  --root DIR   Install into a custom Cargo root directory'
@@ -17,6 +19,8 @@ show_help() {
     printf '%s\n' '  --force      Reinstall even if already present'
     printf '%s\n' '  --no-lock    Skip Cargo lockfile enforcement'
     printf '%s\n' '  --check      Only verify prerequisites and exit'
+    printf '%s\n' '  --install-completions DIR  Write shell completions into DIR'
+    printf '%s\n' '  --install-manpage DIR      Write the manpage into DIR'
     printf '%s\n' '  -h, --help   Show this help'
     printf '%s\n' '  --version    Print the installer version'
 }
@@ -81,6 +85,26 @@ while [ "$#" -gt 0 ]; do
             exit 0
             continue
             ;;
+        --install-completions)
+            shift
+            if [ "$#" -eq 0 ]; then
+                printf '%s\n' 'error: --install-completions requires a directory' >&2
+                exit 1
+            fi
+            completions_dir=$1
+            shift
+            continue
+            ;;
+        --install-manpage)
+            shift
+            if [ "$#" -eq 0 ]; then
+                printf '%s\n' 'error: --install-manpage requires a directory' >&2
+                exit 1
+            fi
+            manpage_dir=$1
+            shift
+            continue
+            ;;
         -h|--help)
             show_help
             exit 0
@@ -121,4 +145,16 @@ if [ -n "$install_root" ]; then
     set -- "$@" --root "$install_root"
 fi
 
-exec "$@"
+"$@"
+
+if [ -n "$completions_dir" ]; then
+    mkdir -p "$completions_dir"
+    for shell in bash elvish fish powershell zsh; do
+        cargo run --quiet --manifest-path "$crate_dir/Cargo.toml" -- completions "$shell" > "$completions_dir/mbr.$shell"
+    done
+fi
+
+if [ -n "$manpage_dir" ]; then
+    mkdir -p "$manpage_dir"
+    cargo run --quiet --manifest-path "$crate_dir/Cargo.toml" -- manpage > "$manpage_dir/mbr.1"
+fi

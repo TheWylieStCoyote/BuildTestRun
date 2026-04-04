@@ -128,6 +128,7 @@ Workspace mode runs a command in each discovered project:
 ```bash
 mbr workspace --list
 mbr workspace build
+mbr workspace --name api build
 ```
 
 Package a release archive locally:

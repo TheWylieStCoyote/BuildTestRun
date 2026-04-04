@@ -22,60 +22,110 @@ pub fn run_from_args() -> Result<i32, Error> {
     let start_dir = cli.workspace.unwrap_or(cwd);
 
     match cli.action {
-        Action::Validate(args) => validate_action(&start_dir, args.strict, cli.json),
+        Action::Validate(args) => {
+            validate_action(&start_dir, args.strict, cli.json, cli.profile.as_deref())
+        }
         Action::Init(args) => init_action(
             &start_dir,
             args.force,
             args.template,
             args.interactive,
+            args.list_templates,
             args.template_file,
             cli.json,
         ),
+        Action::Templates(args) => templates_action(cli.json, args.verbose),
         Action::Workspace(args) => workspace_action(
-            &start_dir, args.list, args.name, args.args, cli.json, cli.safe,
+            &start_dir,
+            args.list,
+            WorkspaceSelection {
+                command_name: args.command,
+                filter_name: args.name,
+            },
+            args.args,
+            cli.json,
+            cli.safe,
+            cli.profile.as_deref(),
         ),
         Action::Package(args) => package_action(&start_dir, args.output, cli.json),
+        Action::Release(args) => {
+            release_action(&start_dir, args.output, cli.json, cli.profile.as_deref())
+        }
         Action::Completions(args) => completions_action(args.shell),
         Action::Manpage => manpage_action(),
-        Action::List(args) => list_action(&start_dir, cli.json, args.verbose),
-        Action::Which => which_action(&start_dir, cli.json),
-        Action::Doctor(args) => doctor_action(&start_dir, args.strict, cli.json),
-        Action::Show(args) => show_action(&start_dir, args.name, args.args, cli.json),
-        Action::Explain(args) => explain_action(&start_dir, args.name, args.args, cli.json),
-        Action::Parallel(args) => {
-            parallel_action(&start_dir, args.names, cli.json, cli.dry_run, cli.safe)
+        Action::List(args) => {
+            list_action(&start_dir, cli.json, args.verbose, cli.profile.as_deref())
         }
+        Action::Which => which_action(&start_dir, cli.json, cli.profile.as_deref()),
+        Action::Doctor(args) => {
+            doctor_action(&start_dir, args.strict, cli.json, cli.profile.as_deref())
+        }
+        Action::Show(args) => show_action(
+            &start_dir,
+            args.name,
+            args.args,
+            cli.json,
+            cli.profile.as_deref(),
+        ),
+        Action::Explain(args) => explain_action(
+            &start_dir,
+            args.name,
+            args.args,
+            cli.json,
+            cli.profile.as_deref(),
+        ),
+        Action::Parallel(args) => parallel_action(
+            &start_dir,
+            args.names,
+            cli.json,
+            cli.dry_run,
+            cli.safe,
+            cli.profile.as_deref(),
+        ),
         action => {
             if cli.dry_run {
-                dry_run_action(action, &start_dir, cli.json, cli.safe)
+                dry_run_action(
+                    action,
+                    &start_dir,
+                    cli.json,
+                    cli.safe,
+                    cli.profile.as_deref(),
+                )
             } else {
-                run_action(action, &start_dir, cli.safe)
+                run_action(action, &start_dir, cli.safe, cli.profile.as_deref())
             }
         }
     }
 }
 
-pub fn run_action(action: Action, start_dir: &Path, safe: bool) -> Result<i32, Error> {
-    let (_, config) = load_project(start_dir)?;
+pub fn run_action(
+    action: Action,
+    start_dir: &Path,
+    safe: bool,
+    profile: Option<&str>,
+) -> Result<i32, Error> {
+    let (_, config) = load_project(start_dir, profile)?;
     let status = runner::execute(action, &config, safe)?;
     Ok(status.code().unwrap_or(1))
 }
 
-pub fn workspace_action(
+pub(crate) fn workspace_action(
     start_dir: &Path,
     list: bool,
-    name: Option<String>,
+    selection: WorkspaceSelection,
     args: Vec<String>,
     json_output: bool,
     safe: bool,
+    profile: Option<&str>,
 ) -> Result<i32, Error> {
     let projects = discovery::discover_project_paths(start_dir)?;
+    let projects =
+        collect_workspace_projects(&projects, profile, selection.filter_name.as_deref())?;
 
     if list {
         let entries: Vec<_> = projects
             .iter()
-            .map(|path| {
-                let config = config::ProjectConfig::load_inherited(path.parent().unwrap_or(path))?;
+            .map(|(path, config)| {
                 Ok(json!({
                     "config": path,
                     "root": config.root,
@@ -105,16 +155,14 @@ pub fn workspace_action(
         return Ok(0);
     }
 
-    let Some(command_name) = name else {
+    let Some(command_name) = selection.command_name else {
         return Err(Error::Execution(
             "workspace requires a command name".to_string(),
         ));
     };
 
     let mut exit_code = 0;
-    for path in projects {
-        let project_start = path.parent().unwrap_or(&path);
-        let config = config::ProjectConfig::load_inherited(project_start)?;
+    for (_, config) in projects {
         if !json_output {
             println!("[mbr] workspace: {}", config.root.display());
         }
@@ -138,10 +186,43 @@ pub fn workspace_action(
     Ok(exit_code)
 }
 
-pub fn validate_action(start_dir: &Path, strict: bool, json_output: bool) -> Result<i32, Error> {
-    let (config_path, config) = load_project(start_dir)?;
+struct WorkspaceSelection {
+    command_name: Option<String>,
+    filter_name: Option<String>,
+}
+
+fn collect_workspace_projects(
+    projects: &[PathBuf],
+    profile: Option<&str>,
+    filter_name: Option<&str>,
+) -> Result<Vec<(PathBuf, config::ProjectConfig)>, Error> {
+    let mut entries = Vec::new();
+
+    for path in projects {
+        let config = config::ProjectConfig::load_inherited_with_profile(
+            path.parent().unwrap_or(path),
+            profile,
+        )?;
+
+        if filter_name.is_some_and(|expected| config.name.as_deref() != Some(expected)) {
+            continue;
+        }
+
+        entries.push((path.clone(), config));
+    }
+
+    Ok(entries)
+}
+
+pub fn validate_action(
+    start_dir: &Path,
+    strict: bool,
+    json_output: bool,
+    profile: Option<&str>,
+) -> Result<i32, Error> {
+    let (config_path, config) = load_project(start_dir, profile)?;
     let warnings = if strict {
-        conventional_command_issues(&config)
+        validation_issues(&config)
     } else {
         Vec::new()
     };
@@ -173,9 +254,14 @@ pub fn init_action(
     force: bool,
     template: cli::InitTemplate,
     interactive: bool,
+    list_templates: bool,
     template_file: Option<PathBuf>,
     json_output: bool,
 ) -> Result<i32, Error> {
+    if list_templates {
+        return templates_action(json_output, false);
+    }
+
     let path = start_dir.join(".mbr.toml");
     if path.exists() && !force {
         return Err(Error::ConfigExists { path });
@@ -260,45 +346,8 @@ fn prompt(label: &str, default: &str) -> Result<String, Error> {
 fn prompt_template(default_template: cli::InitTemplate) -> Result<cli::InitTemplate, Error> {
     use std::io::{stdin, stdout};
 
-    let templates = [
-        cli::InitTemplate::Rust,
-        cli::InitTemplate::Node,
-        cli::InitTemplate::Pnpm,
-        cli::InitTemplate::Yarn,
-        cli::InitTemplate::Bun,
-        cli::InitTemplate::Deno,
-        cli::InitTemplate::Nextjs,
-        cli::InitTemplate::Vite,
-        cli::InitTemplate::Turbo,
-        cli::InitTemplate::Nx,
-        cli::InitTemplate::Python,
-        cli::InitTemplate::Django,
-        cli::InitTemplate::Fastapi,
-        cli::InitTemplate::Flask,
-        cli::InitTemplate::Poetry,
-        cli::InitTemplate::Hatch,
-        cli::InitTemplate::Pixi,
-        cli::InitTemplate::Uv,
-        cli::InitTemplate::Go,
-        cli::InitTemplate::CargoWorkspace,
-        cli::InitTemplate::JavaGradle,
-        cli::InitTemplate::JavaMaven,
-        cli::InitTemplate::KotlinGradle,
-        cli::InitTemplate::Dotnet,
-        cli::InitTemplate::PhpComposer,
-        cli::InitTemplate::RubyBundler,
-        cli::InitTemplate::Rails,
-        cli::InitTemplate::Laravel,
-        cli::InitTemplate::Terraform,
-        cli::InitTemplate::Helm,
-        cli::InitTemplate::DockerCompose,
-        cli::InitTemplate::Cmake,
-        cli::InitTemplate::CmakeNinja,
-        cli::InitTemplate::Generic,
-    ];
-
     println!("Choose a template:");
-    for (idx, item) in templates.iter().enumerate() {
+    for (idx, item) in template_variants().iter().enumerate() {
         println!("  {}. {}", idx + 1, init_template_name(*item));
     }
 
@@ -317,12 +366,12 @@ fn prompt_template(default_template: cli::InitTemplate) -> Result<cli::InitTempl
     }
 
     if let Ok(index) = value.parse::<usize>()
-        && let Some(template) = templates.get(index.saturating_sub(1))
+        && let Some(template) = template_variants().get(index.saturating_sub(1))
     {
         return Ok(*template);
     }
 
-    templates
+    template_variants()
         .iter()
         .copied()
         .find(|template| init_template_name(*template).eq_ignore_ascii_case(value))
@@ -357,26 +406,159 @@ fn prompt_yes_no(label: &str, default: bool) -> Result<bool, Error> {
     }
 }
 
-fn prompt_optional_commands(template: cli::InitTemplate) -> Result<Vec<String>, Error> {
-    if template != cli::InitTemplate::Generic {
-        return Ok(Vec::new());
+fn templates_action(json_output: bool, verbose: bool) -> Result<i32, Error> {
+    let entries: Vec<_> = template_variants()
+        .iter()
+        .map(|template| {
+            json!({
+                "name": init_template_name(*template),
+                "description": config::template_description(*template),
+                "warning": config::template_spec(*template).warning,
+            })
+        })
+        .collect();
+
+    if json_output {
+        print_stable_json(json!({
+            "status": "ok",
+            "count": entries.len(),
+            "templates": entries,
+        }));
+    } else {
+        for entry in entries {
+            if let Value::Object(map) = entry {
+                if let Some(name) = map.get("name").and_then(Value::as_str) {
+                    print!("{name}");
+                }
+                if let Some(description) = map.get("description").and_then(Value::as_str) {
+                    print!(" - {description}");
+                }
+                println!();
+                if verbose && let Some(warning) = map.get("warning").and_then(Value::as_str) {
+                    println!("  warning: {warning}");
+                }
+            }
+        }
     }
 
+    Ok(0)
+}
+
+fn template_variants() -> [cli::InitTemplate; 34] {
+    [
+        cli::InitTemplate::Rust,
+        cli::InitTemplate::Node,
+        cli::InitTemplate::Pnpm,
+        cli::InitTemplate::Yarn,
+        cli::InitTemplate::Bun,
+        cli::InitTemplate::Deno,
+        cli::InitTemplate::Nextjs,
+        cli::InitTemplate::Vite,
+        cli::InitTemplate::Turbo,
+        cli::InitTemplate::Nx,
+        cli::InitTemplate::Python,
+        cli::InitTemplate::Django,
+        cli::InitTemplate::Fastapi,
+        cli::InitTemplate::Flask,
+        cli::InitTemplate::Poetry,
+        cli::InitTemplate::Hatch,
+        cli::InitTemplate::Pixi,
+        cli::InitTemplate::Uv,
+        cli::InitTemplate::Go,
+        cli::InitTemplate::CargoWorkspace,
+        cli::InitTemplate::JavaGradle,
+        cli::InitTemplate::JavaMaven,
+        cli::InitTemplate::KotlinGradle,
+        cli::InitTemplate::Dotnet,
+        cli::InitTemplate::PhpComposer,
+        cli::InitTemplate::RubyBundler,
+        cli::InitTemplate::Rails,
+        cli::InitTemplate::Laravel,
+        cli::InitTemplate::Terraform,
+        cli::InitTemplate::Helm,
+        cli::InitTemplate::DockerCompose,
+        cli::InitTemplate::Cmake,
+        cli::InitTemplate::CmakeNinja,
+        cli::InitTemplate::Generic,
+    ]
+}
+
+struct OptionalPrompt {
+    label: &'static str,
+    command: &'static str,
+}
+
+const GENERIC_OPTIONAL_PROMPTS: [OptionalPrompt; 4] = [
+    OptionalPrompt {
+        label: "Include docs command",
+        command: "docs",
+    },
+    OptionalPrompt {
+        label: "Include dev command",
+        command: "dev",
+    },
+    OptionalPrompt {
+        label: "Include lint command",
+        command: "lint",
+    },
+    OptionalPrompt {
+        label: "Include typecheck command",
+        command: "typecheck",
+    },
+];
+
+const RUST_OPTIONAL_PROMPTS: [OptionalPrompt; 2] = [
+    OptionalPrompt {
+        label: "Include docs command",
+        command: "docs",
+    },
+    OptionalPrompt {
+        label: "Include lint command",
+        command: "lint",
+    },
+];
+
+const NODE_OPTIONAL_PROMPTS: [OptionalPrompt; 2] = [
+    OptionalPrompt {
+        label: "Include dev command",
+        command: "dev",
+    },
+    OptionalPrompt {
+        label: "Include typecheck command",
+        command: "typecheck",
+    },
+];
+
+const PYTHON_OPTIONAL_PROMPTS: [OptionalPrompt; 2] = [
+    OptionalPrompt {
+        label: "Include docs command",
+        command: "docs",
+    },
+    OptionalPrompt {
+        label: "Include lint command",
+        command: "lint",
+    },
+];
+
+fn prompt_optional_commands(template: cli::InitTemplate) -> Result<Vec<String>, Error> {
     let mut commands = Vec::new();
-    if prompt_yes_no("Include docs command", false)? {
-        commands.push("docs".to_string());
-    }
-    if prompt_yes_no("Include dev command", false)? {
-        commands.push("dev".to_string());
-    }
-    if prompt_yes_no("Include lint command", false)? {
-        commands.push("lint".to_string());
-    }
-    if prompt_yes_no("Include typecheck command", false)? {
-        commands.push("typecheck".to_string());
+    for prompt in template_optional_prompts(template) {
+        if prompt_yes_no(prompt.label, false)? {
+            commands.push(prompt.command.to_string());
+        }
     }
 
     Ok(commands)
+}
+
+fn template_optional_prompts(template: cli::InitTemplate) -> &'static [OptionalPrompt] {
+    match template {
+        cli::InitTemplate::Generic => &GENERIC_OPTIONAL_PROMPTS,
+        cli::InitTemplate::Rust => &RUST_OPTIONAL_PROMPTS,
+        cli::InitTemplate::Node => &NODE_OPTIONAL_PROMPTS,
+        cli::InitTemplate::Python => &PYTHON_OPTIONAL_PROMPTS,
+        _ => &[],
+    }
 }
 
 fn render_init_template(spec: &InitSpec, template_file: Option<PathBuf>) -> Result<String, Error> {
@@ -581,7 +763,7 @@ pub fn package_action(
     output: Option<PathBuf>,
     json_output: bool,
 ) -> Result<i32, Error> {
-    let (_, config) = load_project(start_dir)?;
+    let (_, config) = load_project(start_dir, None)?;
     let archive_path = output.unwrap_or_else(|| default_package_path(&config));
 
     if cfg!(windows) {
@@ -597,6 +779,27 @@ pub fn package_action(
     }
 
     Ok(0)
+}
+
+pub fn release_action(
+    start_dir: &Path,
+    output: Option<PathBuf>,
+    json_output: bool,
+    profile: Option<&str>,
+) -> Result<i32, Error> {
+    let (_, config) = load_project(start_dir, profile)?;
+
+    for action in [
+        Action::Build(cli::CommandArgs { args: vec![] }),
+        Action::Test(cli::CommandArgs { args: vec![] }),
+    ] {
+        let status = runner::execute(action, &config, false)?;
+        if !status.success() {
+            return Ok(status.code().unwrap_or(1));
+        }
+    }
+
+    package_action(start_dir, output, json_output)
 }
 
 pub fn completions_action(shell: cli::CompletionShell) -> Result<i32, Error> {
@@ -620,8 +823,13 @@ pub fn manpage_action() -> Result<i32, Error> {
     Ok(0)
 }
 
-pub fn list_action(start_dir: &Path, json_output: bool, verbose: bool) -> Result<i32, Error> {
-    let (_, config) = load_project(start_dir)?;
+pub fn list_action(
+    start_dir: &Path,
+    json_output: bool,
+    verbose: bool,
+    profile: Option<&str>,
+) -> Result<i32, Error> {
+    let (_, config) = load_project(start_dir, profile)?;
     let entries: Vec<_> = config
         .commands
         .names()
@@ -673,8 +881,12 @@ pub fn list_action(start_dir: &Path, json_output: bool, verbose: bool) -> Result
     Ok(0)
 }
 
-pub fn which_action(start_dir: &Path, json_output: bool) -> Result<i32, Error> {
-    let (config_path, config) = load_project(start_dir)?;
+pub fn which_action(
+    start_dir: &Path,
+    json_output: bool,
+    profile: Option<&str>,
+) -> Result<i32, Error> {
+    let (config_path, config) = load_project(start_dir, profile)?;
 
     if json_output {
         print_stable_json(json!({
@@ -689,35 +901,14 @@ pub fn which_action(start_dir: &Path, json_output: bool) -> Result<i32, Error> {
     Ok(0)
 }
 
-pub fn doctor_action(start_dir: &Path, strict: bool, json_output: bool) -> Result<i32, Error> {
-    let (config_path, config) = load_project(start_dir)?;
-    let mut warnings = Vec::new();
-
-    for builtin in ["build", "test", "run", "fmt", "clean", "ci"] {
-        if config.commands.get(builtin).is_none() {
-            warnings.push(format!("missing {builtin} command"));
-        }
-    }
-
-    if config.commands.extra.is_empty() {
-        warnings.push("no extra named commands defined".to_string());
-    }
-
-    for name in config.commands.names() {
-        if let Some(command) = config.commands.get(&name) {
-            if let Some(program) = command.program() {
-                if !program_on_path(program) {
-                    warnings.push(format!(
-                        "command `{name}` program `{program}` was not found on PATH"
-                    ));
-                }
-            } else if command.is_shell() {
-                warnings.push(format!(
-                    "command `{name}` uses a shell string; PATH checks are skipped"
-                ));
-            }
-        }
-    }
+pub fn doctor_action(
+    start_dir: &Path,
+    strict: bool,
+    json_output: bool,
+    profile: Option<&str>,
+) -> Result<i32, Error> {
+    let (config_path, config) = load_project(start_dir, profile)?;
+    let warnings = validation_issues(&config);
 
     if json_output {
         print_stable_json(json!({
@@ -746,8 +937,9 @@ pub fn show_action(
     name: String,
     args: Vec<String>,
     json_output: bool,
+    profile: Option<&str>,
 ) -> Result<i32, Error> {
-    describe_action(start_dir, name, args, json_output, false)
+    describe_action(start_dir, name, args, json_output, false, profile)
 }
 
 pub fn explain_action(
@@ -755,8 +947,9 @@ pub fn explain_action(
     name: String,
     args: Vec<String>,
     json_output: bool,
+    profile: Option<&str>,
 ) -> Result<i32, Error> {
-    describe_action(start_dir, name, args, json_output, true)
+    describe_action(start_dir, name, args, json_output, true, profile)
 }
 
 fn describe_action(
@@ -765,8 +958,9 @@ fn describe_action(
     args: Vec<String>,
     json_output: bool,
     explain: bool,
+    profile: Option<&str>,
 ) -> Result<i32, Error> {
-    let (config_path, config) = load_project(start_dir)?;
+    let (config_path, config) = load_project(start_dir, profile)?;
     let command = config
         .commands
         .get(&name)
@@ -819,8 +1013,9 @@ pub fn dry_run_action(
     start_dir: &Path,
     json_output: bool,
     safe: bool,
+    profile: Option<&str>,
 ) -> Result<i32, Error> {
-    let (config_path, config) = load_project(start_dir)?;
+    let (config_path, config) = load_project(start_dir, profile)?;
     trust_warning(&config);
     let (command_name, args) = action_command(&action);
     let command = config
@@ -850,8 +1045,9 @@ pub fn parallel_action(
     json_output: bool,
     dry_run: bool,
     safe: bool,
+    profile: Option<&str>,
 ) -> Result<i32, Error> {
-    let (_, config) = load_project(start_dir)?;
+    let (_, config) = load_project(start_dir, profile)?;
     trust_warning(&config);
 
     if dry_run {
@@ -977,9 +1173,12 @@ fn program_on_path(program: &str) -> bool {
     false
 }
 
-fn load_project(start_dir: &Path) -> Result<(PathBuf, config::ProjectConfig), Error> {
+fn load_project(
+    start_dir: &Path,
+    profile: Option<&str>,
+) -> Result<(PathBuf, config::ProjectConfig), Error> {
     let config_path = discovery::discover_config(start_dir)?;
-    let config = config::ProjectConfig::load_inherited(start_dir)?;
+    let config = config::ProjectConfig::load_inherited_with_profile(start_dir, profile)?;
     Ok((config_path, config))
 }
 
@@ -997,6 +1196,81 @@ fn conventional_command_issues(config: &config::ProjectConfig) -> Vec<String> {
     }
 
     warnings
+}
+
+fn validation_issues(config: &config::ProjectConfig) -> Vec<String> {
+    let mut warnings = conventional_command_issues(config);
+
+    if let Some(env_file) = config.env_file.as_deref()
+        && !env_file_exists(&config.root, env_file)
+    {
+        warnings.push(format!("env file `{env_file}` was not found"));
+    }
+
+    if let Some(env_file) = config.profile_env_file.as_deref()
+        && !env_file_exists(&config.root, env_file)
+    {
+        let profile = config
+            .selected_profile
+            .as_deref()
+            .unwrap_or("selected profile");
+        warnings.push(format!(
+            "profile `{profile}` env file `{env_file}` was not found"
+        ));
+    }
+
+    for name in config.commands.names() {
+        if let Some(command) = config.commands.get(&name) {
+            if let Some(program) = command.program() {
+                if !program_on_path(program) {
+                    warnings.push(format!(
+                        "command `{name}` program `{program}` was not found on PATH"
+                    ));
+                }
+            } else if command.is_shell() {
+                warnings.push(format!(
+                    "command `{name}` uses a shell string; PATH checks are skipped"
+                ));
+            }
+
+            if let Some(message) = placeholder_run_warning(&name, command) {
+                warnings.push(message);
+            }
+        }
+    }
+
+    warnings
+}
+
+fn env_file_exists(root: &Path, env_file: &str) -> bool {
+    root.join(env_file).is_file()
+}
+
+fn placeholder_run_warning(name: &str, command: &config::CommandSpec) -> Option<String> {
+    if name != "run" {
+        return None;
+    }
+
+    let description = command
+        .description()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if description.contains("placeholder") || description.contains("default target") {
+        return Some(
+            "command `run` appears to be a placeholder and should be customized".to_string(),
+        );
+    }
+
+    if let Some(shell) = command.shell_command() {
+        let normalized = shell.trim().to_ascii_lowercase();
+        if normalized == "echo run" || normalized.contains("placeholder") {
+            return Some(
+                "command `run` appears to be a placeholder and should be customized".to_string(),
+            );
+        }
+    }
+
+    None
 }
 
 fn resolve_workdir(root: &Path, cwd: Option<&str>) -> PathBuf {
@@ -1112,6 +1386,7 @@ fn action_command(action: &Action) -> (String, Vec<String>) {
         Action::Build(args) => ("build".to_string(), args.args.clone()),
         Action::Test(args) => ("test".to_string(), args.args.clone()),
         Action::Run(args) => ("run".to_string(), args.args.clone()),
+        Action::Dev(args) => ("dev".to_string(), args.args.clone()),
         Action::Fmt(args) => ("fmt".to_string(), args.args.clone()),
         Action::Clean(args) => ("clean".to_string(), args.args.clone()),
         Action::Ci(args) => ("ci".to_string(), args.args.clone()),
@@ -1119,8 +1394,10 @@ fn action_command(action: &Action) -> (String, Vec<String>) {
         Action::Parallel(args) => ("parallel".to_string(), args.names.clone()),
         Action::Validate(_)
         | Action::Init(_)
+        | Action::Templates(_)
         | Action::Workspace(_)
         | Action::Package(_)
+        | Action::Release(_)
         | Action::Completions(_)
         | Action::Manpage
         | Action::List(_)

@@ -1,0 +1,34 @@
+rust - Rust projects with cargo build/test/run/fmt/ci commands
+node - Node projects using npm scripts for common tasks
+pnpm - pnpm projects using package.json scripts
+yarn - Yarn projects using package.json scripts
+bun - Bun projects using package.json scripts
+deno - Deno projects using tasks and entrypoints
+nextjs - Next.js apps with standard npm scripts
+vite - Vite apps with standard npm scripts
+turbo - Turborepo workspaces with shared scripts
+nx - Nx workspaces with task targets
+python - Python projects using basic tooling commands
+django - Django projects with manage.py and test commands
+fastapi - FastAPI apps with uvicorn and Python tooling
+flask - Flask apps with debug run commands
+poetry - Poetry-managed Python projects
+hatch - Hatch-managed Python projects
+pixi - Pixi projects using task-oriented commands
+uv - uv-managed Python projects
+go - Go projects with build/test/run commands
+cargo-workspace - Rust workspaces with workspace-wide commands
+java-gradle - Java projects using Gradle wrappers
+java-maven - Java projects using Maven and exec plugins
+kotlin-gradle - Kotlin projects using Gradle wrappers
+dotnet - .NET projects using dotnet CLI workflows
+php-composer - PHP projects using Composer scripts
+ruby-bundler - Ruby projects using Bundler and Rake
+rails - Rails apps with bin/rails workflows
+laravel - Laravel apps with artisan workflows
+terraform - Terraform projects with reviewable infrastructure commands
+helm - Helm charts with packaging and linting commands
+docker-compose - Docker Compose stacks with build and up commands
+cmake - CMake projects with build and test commands
+cmake-ninja - CMake + Ninja projects with fast builds
+generic - A simple starter that you can customize
