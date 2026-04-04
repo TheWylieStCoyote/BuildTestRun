@@ -14,6 +14,7 @@ use std::{
     io::{Seek, Write},
     path::{Path, PathBuf},
     thread,
+    time::Instant,
 };
 
 pub fn run_from_args() -> Result<i32, Error> {
@@ -109,7 +110,16 @@ pub fn run_action(
     profile: Option<&str>,
 ) -> Result<i32, Error> {
     let (_, config) = load_project(start_dir, profile)?;
-    let status = runner::execute(action, &config, safe, None)?;
+    let started = Instant::now();
+    let status = runner::execute(action.clone(), &config, safe, None)?;
+    if !status.success() {
+        print_failure_summary(
+            None,
+            Some(&action.to_string()),
+            status.code(),
+            started.elapsed(),
+        );
+    }
     Ok(status.code().unwrap_or(1))
 }
 
@@ -172,6 +182,7 @@ pub(crate) fn workspace_action(
 
     let mut exit_code = 0;
     for (_, config) in projects {
+        let started = Instant::now();
         if !json_output {
             let prefix = config
                 .name
@@ -191,6 +202,12 @@ pub(crate) fn workspace_action(
         ) {
             Ok(status) => {
                 if !status.success() {
+                    print_failure_summary(
+                        config.name.as_deref(),
+                        Some(command_name.as_str()),
+                        status.code(),
+                        started.elapsed(),
+                    );
                     exit_code = 1;
                 }
             }
@@ -935,8 +952,16 @@ pub fn release_action(
         Action::Build(cli::CommandArgs { args: vec![] }),
         Action::Test(cli::CommandArgs { args: vec![] }),
     ] {
+        let started = Instant::now();
+        let action_label = action.to_string();
         let status = runner::execute(action, &config, false, None)?;
         if !status.success() {
+            print_failure_summary(
+                config.name.as_deref(),
+                Some(&action_label),
+                status.code(),
+                started.elapsed(),
+            );
             return Ok(status.code().unwrap_or(1));
         }
     }
@@ -1231,6 +1256,7 @@ pub fn parallel_action(
         let config = config.clone();
         let label = name.clone();
         handles.push(thread::spawn(move || {
+            let started = Instant::now();
             runner::execute(
                 Action::Exec(cli::ExecArgs {
                     name,
@@ -1240,6 +1266,7 @@ pub fn parallel_action(
                 safe,
                 Some(label.as_str()),
             )
+            .map(|status| (label, status, started.elapsed()))
         }));
     }
 
@@ -1247,8 +1274,9 @@ pub fn parallel_action(
     let mut errors = Vec::new();
     for handle in handles {
         match handle.join() {
-            Ok(Ok(status)) => {
+            Ok(Ok((name, status, duration))) => {
                 if !status.success() {
+                    print_failure_summary(None, Some(&name), status.code(), duration);
                     exit_code = 1;
                 }
             }
@@ -1272,6 +1300,26 @@ pub fn parallel_action(
     }
 
     Ok(exit_code)
+}
+
+fn print_failure_summary(
+    project: Option<&str>,
+    command: Option<&str>,
+    exit_code: Option<i32>,
+    duration: std::time::Duration,
+) {
+    let mut parts = Vec::new();
+    if let Some(project) = project {
+        parts.push(format!("project={project}"));
+    }
+    if let Some(command) = command {
+        parts.push(format!("command={command}"));
+    }
+    if let Some(code) = exit_code {
+        parts.push(format!("exit={code}"));
+    }
+    parts.push(format!("duration={}ms", duration.as_millis()));
+    eprintln!("[mbr] failed: {}", parts.join(" | "));
 }
 
 fn program_on_path(program: &str) -> bool {

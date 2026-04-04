@@ -93,6 +93,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Runs multiple named commands concurrently with `mbr parallel <name>...`
 - Supports pipeline commands with `steps = ["fmt", "lint", "test"]`
 - Prefixes workspace and parallel output with the project or command name
+- Prints failure summaries with exit code, target, and duration
 - Checks for missing commands and PATH issues with `mbr doctor`
 - Supports `--dry-run` for execution commands
 - Supports per-command `cwd` and `timeout`

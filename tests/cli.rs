@@ -67,6 +67,16 @@ fn sleep_and_print_command_spec(output: &str) -> String {
     }
 }
 
+fn failing_command_spec(output: &str, exit_code: i32) -> String {
+    if cfg!(windows) {
+        format!(
+            r#"{{ program = "powershell", args = ["-NoProfile", "-Command", "Write-Output {output}; exit {exit_code}"] }}"#
+        )
+    } else {
+        format!(r#"{{ program = "sh", args = ["-c", "printf {output}; exit {exit_code}"] }}"#)
+    }
+}
+
 fn env_values_command_spec() -> String {
     if cfg!(windows) {
         r#"program = "powershell", args = ["-NoProfile", "-Command", "Write-Output ($env:BASE + '|' + $env:KEEP + '|' + $env:CHILD)"]"#.to_string()
@@ -968,6 +978,28 @@ fn parallel_runs_commands_concurrently() {
 }
 
 #[test]
+fn parallel_reports_failed_command_summary() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        &format!(
+            "[commands]\none = {}\ntwo = {}\n",
+            failing_command_spec("one-fail", 4),
+            print_command_spec("two-ok")
+        ),
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["parallel", "one", "two"])
+        .assert()
+        .failure()
+        .stderr(contains("[mbr] failed: command=one | exit=4"))
+        .stderr(contains("duration="));
+}
+
+#[test]
 fn child_config_inherits_parent_commands() {
     let temp = TempDir::new().expect("temp dir");
     let nested = mkdir(temp.path(), "nested");
@@ -1456,6 +1488,30 @@ fn workspace_runs_command_in_each_project() {
         .success()
         .stdout(contains("[first] first-ok"))
         .stdout(contains("[second] second-ok"));
+}
+
+#[test]
+fn workspace_reports_failed_command_summary() {
+    let temp = TempDir::new().expect("temp dir");
+    let workspace = mkdir(temp.path(), "project");
+    write_config(
+        &workspace,
+        &format!(
+            "[project]\nname = \"project\"\n[commands]\nbuild = {}\n",
+            failing_command_spec("workspace-fail", 3)
+        ),
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["workspace", "build"])
+        .assert()
+        .failure()
+        .stderr(contains(
+            "[mbr] failed: project=project | command=build | exit=3",
+        ))
+        .stderr(contains("duration="));
 }
 
 #[test]

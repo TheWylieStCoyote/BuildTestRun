@@ -11,7 +11,7 @@ Only run commands for projects touched in the current git diff.
 3. [x] Prefixed workspace and parallel output
 Prefix output with the project or command name so multi-project runs stay readable.
 
-4. Better failure summaries
+4. [x] Better failure summaries
 Summarize failed commands with exit code, project name, and duration.
 
 5. Source-aware `show` / `explain`

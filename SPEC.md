@@ -70,6 +70,7 @@ If a project-root `.env` file exists, its values should be loaded before executi
 Commands may define `retries` to retry failed runs.
 `mbr workspace --list` should list discovered projects, `mbr workspace --name <project> --list` should filter by project name, `mbr workspace --changed-only` should filter to changed projects, and `mbr workspace --name <project> <name>` should run a named command in each matching discovered project.
 Workspace and parallel output should be prefixed with the project or command name so multi-target runs stay readable.
+Failed workspace, parallel, and release commands should print a short summary with the target, exit code, and duration.
 `mbr package` should archive the configured project root into a local tarball or zip file.
 `mbr release` should run build and test before creating a package archive.
 `mbr completions <shell>` should print a shell completion script.
