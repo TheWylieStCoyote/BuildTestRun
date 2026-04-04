@@ -56,7 +56,7 @@ Rendered init templates should be validated before writing.
 `mbr explain <command>` should print the command type, resolution details, and the same source provenance.
 `mbr which` should show the resolved config path and project root.
 JSON output should use a stable envelope with `status`, `command`, and command-specific fields.
-`mbr doctor` should report missing commands and PATH issues.
+`mbr doctor` should report missing commands and PATH issues, and suggest fixes for missing tools and env files.
 `mbr doctor --strict` should exit non-zero when warnings exist.
 `mbr show <name>` should display the resolved command, cwd, timeout, and description.
 `mbr --workspace <path>` should resolve the project starting from the given directory.

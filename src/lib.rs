@@ -1108,6 +1108,7 @@ pub fn doctor_action(
 ) -> Result<i32, Error> {
     let (config_path, config) = load_project(start_dir, profile)?;
     let warnings = validation_issues(&config);
+    let suggestions = doctor_suggestions(&config, &warnings);
 
     if json_output {
         print_stable_json(json_envelope(
@@ -1117,6 +1118,7 @@ pub fn doctor_action(
                 ("config", json!(config_path)),
                 ("root", json!(config.root)),
                 ("warnings", json!(warnings)),
+                ("suggestions", json!(suggestions)),
             ],
         ));
     } else {
@@ -1127,6 +1129,9 @@ pub fn doctor_action(
         } else {
             for warning in &warnings {
                 println!("warning: {warning}");
+            }
+            for suggestion in &suggestions {
+                println!("suggestion: {suggestion}");
             }
         }
     }
@@ -1515,6 +1520,50 @@ fn validation_issues(config: &config::ProjectConfig) -> Vec<String> {
     }
 
     warnings
+}
+
+fn doctor_suggestions(config: &config::ProjectConfig, warnings: &[String]) -> Vec<String> {
+    let mut suggestions = Vec::new();
+
+    for warning in warnings {
+        if let Some(tool) = warning
+            .strip_prefix("command `")
+            .and_then(|rest| rest.split_once("` program `"))
+            .and_then(|(_, rest)| rest.split_once('`'))
+            .map(|(tool, _)| tool)
+        {
+            suggestions.push(format!("install `{tool}` or add it to PATH"));
+        }
+
+        if let Some(env_file) = warning
+            .strip_prefix("env file `")
+            .and_then(|rest| rest.split_once('`'))
+            .map(|(env_file, _)| env_file)
+        {
+            suggestions.push(format!(
+                "create `{env_file}` or update `env_file` in the config"
+            ));
+        }
+
+        if let Some(env_file) = warning
+            .strip_prefix("profile `")
+            .and_then(|rest| rest.split_once("` env file `"))
+            .and_then(|(_, rest)| rest.split_once('`'))
+            .map(|(env_file, _)| env_file)
+        {
+            suggestions.push(format!(
+                "create the profile env file `{env_file}` or remove the profile-specific `env_file`"
+            ));
+        }
+    }
+
+    if config.name.is_none() {
+        suggestions.push("set `[project].name` to make warnings easier to understand".to_string());
+    }
+
+    suggestions.sort();
+    suggestions.dedup();
+    suggestions
 }
 
 fn env_file_exists(root: &Path, env_file: &str) -> bool {

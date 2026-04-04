@@ -97,6 +97,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Prefixes workspace and parallel output with the project or command name
 - Prints failure summaries with exit code, target, and duration
 - Checks for missing commands and PATH issues with `mbr doctor`
+- `mbr doctor` suggests fixes for missing PATH tools and env files
 - Supports `--dry-run` for execution commands
 - Supports per-command `cwd` and `timeout`
 - Uses the configured project root when provided

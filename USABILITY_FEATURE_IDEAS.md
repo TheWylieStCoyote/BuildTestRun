@@ -20,7 +20,7 @@ Show where each resolved value came from: base config, child config, profile, or
 6. [x] Consistent JSON envelopes
 Use stable `status`, `count`, `project`, `command`, and `warnings` fields across commands.
 
-7. More actionable `doctor`
+7. [x] More actionable `doctor`
 Suggest likely fixes when PATH tools or env files are missing.
 
 8. `init --print`

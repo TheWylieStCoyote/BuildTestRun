@@ -558,6 +558,38 @@ fn doctor_json_has_stable_envelope() {
     assert_eq!(value["status"], "warn");
     assert_eq!(value["command"], "doctor");
     assert!(value["warnings"].as_array().is_some());
+    assert!(value["suggestions"].as_array().is_some());
+}
+
+#[test]
+fn doctor_suggests_fixes_for_missing_tools_and_env_files() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+env_file = ".env.missing"
+
+[commands]
+build = { program = "definitely-not-on-path-12345" }
+"#,
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(contains(
+            "warning: command `build` program `definitely-not-on-path-12345` was not found on PATH",
+        ))
+        .stdout(contains("warning: env file `.env.missing` was not found"))
+        .stdout(contains(
+            "suggestion: install `definitely-not-on-path-12345` or add it to PATH",
+        ))
+        .stdout(contains(
+            "suggestion: create `.env.missing` or update `env_file` in the config",
+        ));
 }
 
 #[test]
