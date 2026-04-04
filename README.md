@@ -80,6 +80,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Generates a starter config with `mbr init --template <name>`
 - Supports interactive prompts with `mbr init --interactive`
 - Detects common project types with `mbr init --detect`
+- `mbr init --detect --interactive` uses the detected template as the default prompt
 - Prints starter configs with `mbr init --print`
 - Interactive init can add template-specific optional commands and safe structured-only mode
 - Lists starter templates with `mbr templates` or `mbr init --list-templates`

@@ -29,7 +29,7 @@ Render a starter config to stdout instead of writing a file.
 9. [x] Better provenance in `which`
 Show config chain and selected profile clearly.
 
-10. Template detection plus prompts
+10. [x] Template detection plus prompts
 Start from a detected ecosystem, then ask only the most useful follow-up questions.
 
 ## What Would Make It Feel Really Usable

@@ -48,6 +48,7 @@ Template variants should include rust, node, pnpm, yarn, bun, deno, nextjs, vite
 `mbr init --interactive` should prompt for project name, root, and template.
 `mbr init --interactive` may also prompt for template-specific optional commands and safe structured-only mode.
 `mbr init --detect` should infer a starter template from common marker files like `Cargo.toml`, `package.json`, `pyproject.toml`, and `CMakeLists.txt`.
+`mbr init --detect --interactive` should use the detected template as the default prompt.
 `mbr init --print` should render the starter config to stdout without writing `.mbr.toml`.
 `mbr init --list-templates` and `mbr templates` should list starter templates with descriptions.
 `mbr init --template-file <path>` should render a custom starter template from a file or a directory containing a template file.

@@ -448,6 +448,37 @@ fn init_detects_template_from_project_markers() {
 }
 
 #[test]
+fn init_detected_template_drives_interactive_prompts() {
+    let temp = TempDir::new().expect("temp dir");
+    fs::write(
+        temp.path().join("package.json"),
+        "{\n  \"name\": \"demo\"\n}\n",
+    )
+    .expect("write marker");
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["init", "--detect", "--interactive"])
+        .write_stdin(
+            "demo
+.
+
+n
+n
+n
+",
+        )
+        .assert()
+        .stdout(contains("Template [node]:"))
+        .success();
+
+    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    assert!(contents.contains("program = \"npm\""));
+    assert!(contents.contains("run = { program = \"npm\""));
+}
+
+#[test]
 fn init_supports_extended_template_catalog() {
     let cases = [
         ("bun", "program = \"bun\""),
