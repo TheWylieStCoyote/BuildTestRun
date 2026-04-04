@@ -366,6 +366,28 @@ fn init_writes_starter_config() {
 }
 
 #[test]
+fn init_prints_starter_config_without_writing() {
+    let temp = TempDir::new().expect("temp dir");
+    fs::write(
+        temp.path().join(".mbr.toml"),
+        "[commands]\nbuild = \"echo existing\"\n",
+    )
+    .expect("seed config");
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["init", "--print"])
+        .assert()
+        .success()
+        .stdout(contains("[commands]"))
+        .stdout(contains("program = \"cargo\""));
+
+    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    assert!(contents.contains("echo existing"));
+}
+
+#[test]
 fn init_uses_requested_template() {
     let temp = TempDir::new().expect("temp dir");
 

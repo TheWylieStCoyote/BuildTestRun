@@ -43,6 +43,7 @@ pub fn run_from_args() -> Result<i32, Error> {
             InitOptions {
                 interactive: args.interactive,
                 detect: args.detect,
+                print: args.print,
                 list_templates: args.list_templates,
                 template_file: args.template_file,
             },
@@ -397,7 +398,7 @@ pub(crate) fn init_action(
     };
 
     let path = start_dir.join(".mbr.toml");
-    if path.exists() && !force {
+    if !options.print && path.exists() && !force {
         return Err(Error::ConfigExists { path });
     }
 
@@ -414,6 +415,22 @@ pub(crate) fn init_action(
     };
 
     let rendered = render_init_template(&init_spec, options.template_file)?;
+
+    if options.print {
+        if json_output {
+            print_stable_json(json_envelope(
+                "init",
+                "ok",
+                vec![("rendered", json!(rendered)), ("printed", json!(true))],
+            ));
+        } else {
+            print!("{rendered}");
+            if !rendered.ends_with('\n') {
+                println!();
+            }
+        }
+        return Ok(0);
+    }
 
     fs::write(&path, rendered).map_err(|source| Error::ConfigWrite {
         path: path.clone(),
@@ -443,6 +460,7 @@ struct InitSpec {
 struct InitOptions {
     interactive: bool,
     detect: bool,
+    print: bool,
     list_templates: bool,
     template_file: Option<PathBuf>,
 }

@@ -23,7 +23,7 @@ Use stable `status`, `count`, `project`, `command`, and `warnings` fields across
 7. [x] More actionable `doctor`
 Suggest likely fixes when PATH tools or env files are missing.
 
-8. `init --print`
+8. [x] `init --print`
 Render a starter config to stdout instead of writing a file.
 
 9. Better provenance in `which`
