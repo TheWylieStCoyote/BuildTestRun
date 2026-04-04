@@ -126,6 +126,9 @@ pub struct InitArgs {
     pub interactive: bool,
 
     #[arg(long)]
+    pub detect: bool,
+
+    #[arg(long)]
     pub list_templates: bool,
 
     #[arg(long, value_name = "PATH")]

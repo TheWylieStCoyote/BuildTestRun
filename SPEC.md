@@ -47,6 +47,7 @@ When a user runs `mbr build`, `mbr test`, `mbr run`, or `mbr exec <name>`, the C
 Template variants should include rust, node, pnpm, yarn, bun, deno, nextjs, vite, turbo, nx, python, django, fastapi, flask, poetry, hatch, pixi, uv, go, cargo-workspace, java-gradle, java-maven, kotlin-gradle, dotnet, php-composer, ruby-bundler, rails, laravel, terraform, helm, docker-compose, cmake, cmake-ninja, and generic.
 `mbr init --interactive` should prompt for project name, root, and template.
 `mbr init --interactive` may also prompt for template-specific optional commands and safe structured-only mode.
+`mbr init --detect` should infer a starter template from common marker files like `Cargo.toml`, `package.json`, `pyproject.toml`, and `CMakeLists.txt`.
 `mbr init --list-templates` and `mbr templates` should list starter templates with descriptions.
 `mbr init --template-file <path>` should render a custom starter template from a file or a directory containing a template file.
 Rendered init templates should be validated before writing.

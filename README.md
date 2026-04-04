@@ -18,6 +18,7 @@ mbr validate --strict
 mbr --profile dev build
 mbr init --template node
 mbr init --interactive
+mbr init --detect
 mbr init --list-templates
 mbr init --template-file custom-template.toml
 mbr templates
@@ -77,6 +78,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Strict validation checks PATH availability, env files, and placeholder `run` commands
 - Generates a starter config with `mbr init --template <name>`
 - Supports interactive prompts with `mbr init --interactive`
+- Detects common project types with `mbr init --detect`
 - Interactive init can add template-specific optional commands and safe structured-only mode
 - Lists starter templates with `mbr templates` or `mbr init --list-templates`
 - Supports custom template files or directories with `mbr init --template-file <path>`

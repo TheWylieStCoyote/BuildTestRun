@@ -363,6 +363,50 @@ fn init_uses_requested_template() {
 }
 
 #[test]
+fn init_detects_template_from_project_markers() {
+    let cases = [
+        (
+            "Cargo.toml",
+            "[package]\nname = \"demo\"\nversion = \"0.1.0\"\n",
+            "program = \"cargo\"",
+        ),
+        (
+            "package.json",
+            "{\n  \"name\": \"demo\"\n}\n",
+            "program = \"npm\"",
+        ),
+        (
+            "pyproject.toml",
+            "[project]\nname = \"demo\"\n",
+            "program = \"python\"",
+        ),
+        (
+            "CMakeLists.txt",
+            "cmake_minimum_required(VERSION 3.20)\nproject(demo)\n",
+            "program = \"cmake\"",
+        ),
+    ];
+
+    for (file_name, contents, expected) in cases {
+        let temp = TempDir::new().expect("temp dir");
+        fs::write(temp.path().join(file_name), contents).expect("write marker");
+
+        Command::cargo_bin("mbr")
+            .expect("binary")
+            .current_dir(temp.path())
+            .args(["init", "--detect"])
+            .assert()
+            .success();
+
+        let rendered = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+        assert!(
+            rendered.contains(expected),
+            "{file_name} should detect a matching template"
+        );
+    }
+}
+
+#[test]
 fn init_supports_extended_template_catalog() {
     let cases = [
         ("bun", "program = \"bun\""),

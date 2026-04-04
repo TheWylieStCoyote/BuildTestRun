@@ -29,9 +29,12 @@ pub fn run_from_args() -> Result<i32, Error> {
             &start_dir,
             args.force,
             args.template,
-            args.interactive,
-            args.list_templates,
-            args.template_file,
+            InitOptions {
+                interactive: args.interactive,
+                detect: args.detect,
+                list_templates: args.list_templates,
+                template_file: args.template_file,
+            },
             cli.json,
         ),
         Action::Templates(args) => templates_action(cli.json, args.verbose),
@@ -249,25 +252,29 @@ pub fn validate_action(
     Ok(exit_code)
 }
 
-pub fn init_action(
+pub(crate) fn init_action(
     start_dir: &Path,
     force: bool,
     template: cli::InitTemplate,
-    interactive: bool,
-    list_templates: bool,
-    template_file: Option<PathBuf>,
+    options: InitOptions,
     json_output: bool,
 ) -> Result<i32, Error> {
-    if list_templates {
+    if options.list_templates {
         return templates_action(json_output, false);
     }
+
+    let template = if options.detect {
+        detect_init_template(start_dir).unwrap_or(template)
+    } else {
+        template
+    };
 
     let path = start_dir.join(".mbr.toml");
     if path.exists() && !force {
         return Err(Error::ConfigExists { path });
     }
 
-    let init_spec = if interactive {
+    let init_spec = if options.interactive {
         prompt_init_spec(template)?
     } else {
         InitSpec {
@@ -279,7 +286,7 @@ pub fn init_action(
         }
     };
 
-    let rendered = render_init_template(&init_spec, template_file)?;
+    let rendered = render_init_template(&init_spec, options.template_file)?;
 
     fs::write(&path, rendered).map_err(|source| Error::ConfigWrite {
         path: path.clone(),
@@ -304,6 +311,13 @@ struct InitSpec {
     template: cli::InitTemplate,
     safe_mode: bool,
     optional_commands: Vec<String>,
+}
+
+struct InitOptions {
+    interactive: bool,
+    detect: bool,
+    list_templates: bool,
+    template_file: Option<PathBuf>,
 }
 
 fn prompt_init_spec(default_template: cli::InitTemplate) -> Result<InitSpec, Error> {
@@ -376,6 +390,41 @@ fn prompt_template(default_template: cli::InitTemplate) -> Result<cli::InitTempl
         .copied()
         .find(|template| init_template_name(*template).eq_ignore_ascii_case(value))
         .ok_or_else(|| Error::Execution(format!("unknown template selection: {value}")))
+}
+
+fn detect_init_template(start_dir: &Path) -> Option<cli::InitTemplate> {
+    for dir in start_dir.ancestors() {
+        if let Some(template) = detect_template_in_dir(dir) {
+            return Some(template);
+        }
+    }
+
+    None
+}
+
+fn detect_template_in_dir(dir: &Path) -> Option<cli::InitTemplate> {
+    let cargo_toml = dir.join("Cargo.toml");
+    if cargo_toml.is_file() {
+        let contents = fs::read_to_string(&cargo_toml).ok()?;
+        if contents.contains("[workspace]") {
+            return Some(cli::InitTemplate::CargoWorkspace);
+        }
+        return Some(cli::InitTemplate::Rust);
+    }
+
+    if dir.join("package.json").is_file() {
+        return Some(cli::InitTemplate::Node);
+    }
+
+    if dir.join("pyproject.toml").is_file() {
+        return Some(cli::InitTemplate::Python);
+    }
+
+    if dir.join("CMakeLists.txt").is_file() {
+        return Some(cli::InitTemplate::Cmake);
+    }
+
+    None
 }
 
 fn prompt_yes_no(label: &str, default: bool) -> Result<bool, Error> {

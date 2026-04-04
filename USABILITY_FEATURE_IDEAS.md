@@ -2,7 +2,7 @@
 
 ## Best Next Features
 
-1. `init --detect`
+1. [x] `init --detect`
 Detect Rust, Node, Python, and CMake projects automatically from files like `Cargo.toml`, `package.json`, `pyproject.toml`, and `CMakeLists.txt`.
 
 2. `workspace --changed-only`
