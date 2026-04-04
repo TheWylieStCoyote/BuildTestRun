@@ -146,6 +146,9 @@ pub struct WorkspaceArgs {
     #[arg(long)]
     pub list: bool,
 
+    #[arg(long)]
+    pub changed_only: bool,
+
     #[arg(long, value_name = "NAME")]
     pub name: Option<String>,
 

@@ -2,7 +2,7 @@ use assert_cmd::Command;
 use predicates::prelude::PredicateBooleanExt;
 use predicates::str::contains;
 use serde_json::Value;
-use std::{fs, path::Path};
+use std::{fs, path::Path, process::Command as ProcessCommand};
 use tempfile::TempDir;
 
 fn write_config(dir: &Path, body: &str) {
@@ -13,6 +13,15 @@ fn mkdir(dir: &Path, name: &str) -> std::path::PathBuf {
     let path = dir.join(name);
     fs::create_dir_all(&path).expect("create dir");
     path
+}
+
+fn run_git(dir: &Path, args: &[&str]) {
+    let status = ProcessCommand::new("git")
+        .current_dir(dir)
+        .args(args)
+        .status()
+        .expect("run git");
+    assert!(status.success(), "git {:?} failed", args);
 }
 
 fn print_command_spec(output: &str) -> String {
@@ -1331,6 +1340,59 @@ fn workspace_filters_projects_by_name() {
         .success()
         .stdout(contains("name: first"))
         .stdout(predicates::str::contains("name: second").not());
+}
+
+#[test]
+fn workspace_filters_projects_by_changed_files() {
+    let temp = TempDir::new().expect("temp dir");
+    let first = mkdir(temp.path(), "first");
+    let second = mkdir(temp.path(), "second");
+    write_config(
+        &first,
+        &format!(
+            "[project]\nname = \"first\"\n[commands]\nbuild = {}\n",
+            print_command_spec("first-ok")
+        ),
+    );
+    write_config(
+        &second,
+        &format!(
+            "[project]\nname = \"second\"\n[commands]\nbuild = {}\n",
+            print_command_spec("second-ok")
+        ),
+    );
+
+    run_git(temp.path(), &["init", "-q"]);
+    run_git(temp.path(), &["config", "user.name", "mbr"]);
+    run_git(temp.path(), &["config", "user.email", "mbr@example.com"]);
+    run_git(temp.path(), &["add", "."]);
+    run_git(temp.path(), &["commit", "-q", "-m", "initial"]);
+
+    write_config(
+        &second,
+        &format!(
+            "[project]\nname = \"second\"\n[commands]\nbuild = {}\n",
+            print_command_spec("second-changed")
+        ),
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["workspace", "--changed-only", "--list"])
+        .assert()
+        .success()
+        .stdout(contains("name: second"))
+        .stdout(predicates::str::contains("name: first").not());
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["workspace", "--changed-only", "build"])
+        .assert()
+        .success()
+        .stdout(contains("second-changed"))
+        .stdout(predicates::str::contains("first-ok").not());
 }
 
 #[test]

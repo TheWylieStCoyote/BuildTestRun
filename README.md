@@ -30,6 +30,7 @@ mbr show build
 mbr explain build
 mbr --workspace workspace build
 mbr workspace --name api build
+mbr workspace --changed-only build
 mbr parallel fmt lint test
 mbr workspace --list
 mbr workspace build
@@ -109,6 +110,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Supports `retries` on commands
 - Supports `workspace` to discover and run commands across projects
 - Supports `workspace --name <project>` to filter discovered projects by project name
+- Supports `workspace --changed-only` to limit execution to changed projects
 - Supports `package` to create local release archives
 - Supports `release` to run build/test and then package
 - Supports `completions` and `manpage` generation

@@ -5,7 +5,7 @@
 1. [x] `init --detect`
 Detect Rust, Node, Python, and CMake projects automatically from files like `Cargo.toml`, `package.json`, `pyproject.toml`, and `CMakeLists.txt`.
 
-2. `workspace --changed-only`
+2. [x] `workspace --changed-only`
 Only run commands for projects touched in the current git diff.
 
 3. Prefixed workspace and parallel output

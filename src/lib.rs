@@ -44,6 +44,7 @@ pub fn run_from_args() -> Result<i32, Error> {
             WorkspaceSelection {
                 command_name: args.command,
                 filter_name: args.name,
+                changed_only: args.changed_only,
             },
             args.args,
             cli.json,
@@ -124,6 +125,11 @@ pub(crate) fn workspace_action(
     let projects = discovery::discover_project_paths(start_dir)?;
     let projects =
         collect_workspace_projects(&projects, profile, selection.filter_name.as_deref())?;
+    let projects = if selection.changed_only {
+        filter_changed_workspace_projects(start_dir, projects)?
+    } else {
+        projects
+    };
 
     if list {
         let entries: Vec<_> = projects
@@ -192,6 +198,7 @@ pub(crate) fn workspace_action(
 struct WorkspaceSelection {
     command_name: Option<String>,
     filter_name: Option<String>,
+    changed_only: bool,
 }
 
 fn collect_workspace_projects(
@@ -215,6 +222,86 @@ fn collect_workspace_projects(
     }
 
     Ok(entries)
+}
+
+fn filter_changed_workspace_projects(
+    start_dir: &Path,
+    projects: Vec<(PathBuf, config::ProjectConfig)>,
+) -> Result<Vec<(PathBuf, config::ProjectConfig)>, Error> {
+    let changed_paths = git_changed_paths(start_dir)?;
+    Ok(projects
+        .into_iter()
+        .filter(|(path, config)| {
+            let project_root = config
+                .root
+                .canonicalize()
+                .unwrap_or_else(|_| config.root.clone());
+            let config_dir = path.parent().unwrap_or(path);
+            let config_root = config_dir
+                .canonicalize()
+                .unwrap_or_else(|_| config_dir.to_path_buf());
+
+            changed_paths.iter().any(|changed| {
+                changed.starts_with(&project_root) || changed.starts_with(&config_root)
+            })
+        })
+        .collect())
+}
+
+fn git_changed_paths(start_dir: &Path) -> Result<Vec<PathBuf>, Error> {
+    let repo_root = git_repo_root(start_dir)?;
+    let mut changed = Vec::new();
+
+    let output = std::process::Command::new("git")
+        .current_dir(start_dir)
+        .args(["status", "--porcelain=1", "--untracked-files=all"])
+        .output()
+        .map_err(|source| Error::Execution(source.to_string()))?;
+
+    if !output.status.success() {
+        return Err(Error::Execution("failed to query git changes".to_string()));
+    }
+
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        if line.len() < 4 {
+            continue;
+        }
+
+        let path = line[3..].trim();
+        if path.is_empty() {
+            continue;
+        }
+
+        let path = path.split(" -> ").last().unwrap_or(path);
+        changed.push(repo_root.join(path));
+    }
+
+    changed.sort();
+    changed.dedup();
+    Ok(changed)
+}
+
+fn git_repo_root(start_dir: &Path) -> Result<PathBuf, Error> {
+    let output = std::process::Command::new("git")
+        .current_dir(start_dir)
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+        .map_err(|source| Error::Execution(source.to_string()))?;
+
+    if !output.status.success() {
+        return Err(Error::Execution(
+            "failed to resolve git repository root".to_string(),
+        ));
+    }
+
+    let root = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if root.is_empty() {
+        return Err(Error::Execution(
+            "failed to resolve git repository root".to_string(),
+        ));
+    }
+
+    Ok(PathBuf::from(root))
 }
 
 pub fn validate_action(
