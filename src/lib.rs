@@ -2528,6 +2528,7 @@ fn conventional_command_issues(config: &config::ProjectConfig) -> Vec<String> {
 fn validation_issues(config: &config::ProjectConfig) -> Vec<String> {
     let mut warnings = conventional_command_issues(config);
     warnings.extend(requirements_issues(config));
+    warnings.extend(trust_issues(config));
 
     if let Some(env_file) = config.env_file.as_deref()
         && !env_file_exists(&config.root, env_file)
@@ -2564,6 +2565,26 @@ fn validation_issues(config: &config::ProjectConfig) -> Vec<String> {
             if let Some(message) = placeholder_run_warning(&name, command) {
                 warnings.push(message);
             }
+        }
+    }
+
+    warnings
+}
+
+fn trust_issues(config: &config::ProjectConfig) -> Vec<String> {
+    let mut warnings = Vec::new();
+
+    if config.trust.shell_commands {
+        return warnings;
+    }
+
+    for name in config.commands.names() {
+        if let Some(command) = config.commands.get(&name)
+            && command.is_shell()
+        {
+            warnings.push(format!(
+                "command `{name}` uses a shell string and is not explicitly trusted"
+            ));
         }
     }
 
@@ -2650,6 +2671,16 @@ fn doctor_suggestions(config: &config::ProjectConfig, warnings: &[String]) -> Ve
             .map(|(env_name, _)| env_name)
         {
             suggestions.push(format!("set `{env_name}` or update `[requirements].env`"));
+        }
+
+        if let Some(name) = warning
+            .strip_prefix("command `")
+            .and_then(|rest| rest.split_once("` uses a shell string and is not explicitly trusted"))
+            .map(|(name, _)| name)
+        {
+            suggestions.push(format!(
+                "set `[trust].shell_commands = true` or convert `{name}` to a structured command"
+            ));
         }
     }
 

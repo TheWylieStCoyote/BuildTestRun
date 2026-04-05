@@ -852,6 +852,67 @@ env = ["REQUIRED_TOKEN"]
 }
 
 #[test]
+fn doctor_warns_on_untrusted_shell_commands() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = "echo build"
+test = { program = "cargo", args = ["test"] }
+run = { program = "cargo", args = ["run"] }
+fmt = { program = "cargo", args = ["fmt"] }
+clean = { program = "cargo", args = ["clean"] }
+ci = { program = "cargo", args = ["test"] }
+
+[trust]
+shell_commands = false
+"#,
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(contains(
+            "warning: command `build` uses a shell string and is not explicitly trusted",
+        ))
+        .stdout(contains(
+            "suggestion: set `[trust].shell_commands = true` or convert `build` to a structured command",
+        ));
+}
+
+#[test]
+fn doctor_accepts_trusted_shell_commands() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = "echo build"
+test = { program = "cargo", args = ["test"] }
+run = { program = "cargo", args = ["run"] }
+fmt = { program = "cargo", args = ["fmt"] }
+clean = { program = "cargo", args = ["clean"] }
+ci = { program = "cargo", args = ["test"] }
+
+[trust]
+shell_commands = true
+"#,
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("not explicitly trusted").not());
+}
+
+#[test]
 fn doctor_fix_creates_missing_env_files() {
     let temp = TempDir::new().expect("temp dir");
     write_config(

@@ -15,6 +15,8 @@ pub struct ProjectFile {
     #[serde(default)]
     pub env_file: Option<String>,
     #[serde(default)]
+    pub trust: TrustSection,
+    #[serde(default)]
     pub requirements: RequirementsSection,
     #[serde(default)]
     pub profiles: HashMap<String, ProfileSection>,
@@ -35,9 +37,17 @@ pub struct ProfileSection {
     #[serde(default)]
     pub env_file: Option<String>,
     #[serde(default)]
+    pub trust: TrustSection,
+    #[serde(default)]
     pub requirements: RequirementsSection,
     #[serde(default)]
     pub commands: CommandsSection,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct TrustSection {
+    #[serde(default)]
+    pub shell_commands: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -443,6 +453,7 @@ pub struct ProjectConfig {
     pub root: PathBuf,
     pub env: HashMap<String, String>,
     pub env_file: Option<String>,
+    pub trust: TrustSection,
     pub selected_profile: Option<String>,
     pub profile_env_file: Option<String>,
     pub requirements: RequirementsSection,
@@ -472,6 +483,7 @@ impl ProjectConfig {
         let mut commands = CommandsSection::default();
         let mut profiles: HashMap<String, ProfileSection> = HashMap::new();
         let mut env_file: Option<String> = None;
+        let mut trust = TrustSection::default();
         let mut requirements = RequirementsSection::default();
         let profile_name = selected_profile_name(selected_profile);
         let selected_profile_name = profile_name.clone();
@@ -498,6 +510,7 @@ impl ProjectConfig {
             if file.env_file.is_some() {
                 env_file = file.env_file;
             }
+            trust.shell_commands |= file.trust.shell_commands;
             merge_requirements(&mut requirements, file.requirements);
             merge_profiles(&mut profiles, file.profiles);
             commands.merge_from(file.commands);
@@ -506,6 +519,7 @@ impl ProjectConfig {
         apply_selected_profile(
             &mut env,
             &mut commands,
+            &mut trust,
             &mut requirements,
             &profiles,
             selected_profile,
@@ -537,6 +551,7 @@ impl ProjectConfig {
             root,
             env,
             env_file,
+            trust,
             selected_profile: selected_profile_name,
             profile_env_file: profile_name
                 .as_deref()
@@ -566,6 +581,7 @@ impl ProjectConfig {
 
         let mut env = file.env;
         load_env_file(&root, file.env_file.as_deref(), &mut env)?;
+        let mut trust = file.trust;
         let mut requirements = file.requirements;
 
         if file.commands.is_empty() {
@@ -577,6 +593,7 @@ impl ProjectConfig {
         apply_selected_profile(
             &mut env,
             &mut commands,
+            &mut trust,
             &mut requirements,
             &file.profiles,
             None,
@@ -592,6 +609,7 @@ impl ProjectConfig {
             root,
             env,
             env_file: file.env_file,
+            trust,
             selected_profile: selected_profile_name,
             profile_env_file: profile_name
                 .as_deref()
@@ -695,6 +713,7 @@ fn merge_profiles(
 fn apply_selected_profile(
     env: &mut HashMap<String, String>,
     commands: &mut CommandsSection,
+    trust: &mut TrustSection,
     requirements: &mut RequirementsSection,
     profiles: &HashMap<String, ProfileSection>,
     selected_profile: Option<&str>,
@@ -717,6 +736,7 @@ fn apply_selected_profile(
     };
 
     env.extend(profile.env.clone());
+    trust.shell_commands |= profile.trust.shell_commands;
     merge_requirements(requirements, profile.requirements.clone());
     commands.merge_from(profile.commands.clone());
     Ok(())

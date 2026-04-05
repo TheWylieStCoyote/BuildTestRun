@@ -105,6 +105,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Supports workspace ordering with `--order name`
 - Supports `mbr watch` for repeated execution on file changes
 - Supports `[requirements]` for required tools, files, and env vars
+- Supports `[trust].shell_commands` to explicitly allow shell-based commands
 - Supports pipeline commands with `steps = ["fmt", "lint", "test"]`
 - Prefixes workspace and parallel output with the project or command name
 - Prints failure summaries with exit code, target, and duration

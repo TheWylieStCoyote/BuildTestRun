@@ -16,7 +16,7 @@ Add `mbr watch build`, `mbr watch test`, and `mbr watch workspace ...` for tight
 4. [x] Explicit requirements in config
 Let projects declare required tools, files, and env vars so `doctor` can validate them directly.
 
-5. Trust model improvements
+5. [x] Trust model improvements
 Add an explicit trust workflow for shell-based commands and untrusted repositories.
 
 6. JSON event streams
