@@ -15,6 +15,7 @@ use std::{
     collections::HashSet,
     collections::VecDeque,
     env, fs,
+    hash::{DefaultHasher, Hash, Hasher},
     io::{Seek, Write},
     path::{Path, PathBuf},
     sync::{
@@ -777,6 +778,7 @@ struct WatchEntry {
     path: PathBuf,
     modified: Option<SystemTime>,
     len: u64,
+    fingerprint: u64,
 }
 
 fn snapshot_watch_tree(start_dir: &Path) -> Result<Vec<WatchEntry>, Error> {
@@ -804,10 +806,15 @@ fn collect_watch_entries(dir: &Path, entries: &mut Vec<WatchEntry>) -> Result<()
             let metadata = entry
                 .metadata()
                 .map_err(|source| Error::Execution(source.to_string()))?;
+            let contents =
+                fs::read(&path).map_err(|source| Error::Execution(source.to_string()))?;
+            let mut hasher = DefaultHasher::new();
+            contents.hash(&mut hasher);
             entries.push(WatchEntry {
                 path,
                 modified: metadata.modified().ok(),
                 len: metadata.len(),
+                fingerprint: hasher.finish(),
             });
         }
     }

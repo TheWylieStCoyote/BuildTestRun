@@ -233,9 +233,6 @@ pub struct CompletionsArgs {
     pub shell: CompletionShell,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Args)]
-pub struct SchemaArgs {}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum CompletionShell {
     Bash,
