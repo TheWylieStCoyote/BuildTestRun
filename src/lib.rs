@@ -11,9 +11,14 @@ use clap::{CommandFactory, Parser};
 use serde_json::{Map, Value, json};
 use std::{
     collections::HashSet,
+    collections::VecDeque,
     env, fs,
     io::{Seek, Write},
     path::{Path, PathBuf},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
     thread,
     time::Instant,
 };
@@ -60,6 +65,10 @@ pub fn run_from_args() -> Result<i32, Error> {
                 filter_name: args.name,
                 changed_only: args.changed_only || args.since.is_some(),
                 since: args.since,
+                jobs: args.jobs,
+                fail_fast: args.fail_fast,
+                keep_going: args.keep_going,
+                order: args.order,
             },
             args.args,
             cli.json,
@@ -162,6 +171,7 @@ pub(crate) fn workspace_action(
     } else {
         projects
     };
+    let projects = order_workspace_projects(projects, selection.order);
 
     if list {
         let entries: Vec<_> = projects
@@ -206,8 +216,37 @@ pub(crate) fn workspace_action(
         ));
     };
 
+    if selection.fail_fast && selection.keep_going {
+        return Err(Error::Execution(
+            "workspace --fail-fast and --keep-going are mutually exclusive".to_string(),
+        ));
+    }
+
+    let jobs = selection.jobs.unwrap_or(1);
+    if jobs == 0 {
+        return Err(Error::Execution(
+            "workspace --jobs must be at least 1".to_string(),
+        ));
+    }
+
+    if jobs > 1 {
+        return execute_workspace_projects(
+            &projects,
+            WorkspaceRunOptions {
+                command_name: &command_name,
+                args: &args,
+                safe,
+                json_output,
+                jobs,
+                keep_going: selection.keep_going || !selection.fail_fast,
+                fail_fast: selection.fail_fast,
+                started,
+            },
+        );
+    }
+
     let mut exit_code = 0;
-    let executed = projects.len();
+    let mut executed = 0;
     let project_entries = if json_output {
         Some(
             projects
@@ -225,6 +264,7 @@ pub(crate) fn workspace_action(
         None
     };
     for (_, config) in projects {
+        executed += 1;
         let started = Instant::now();
         if !json_output {
             let prefix = config
@@ -253,6 +293,9 @@ pub(crate) fn workspace_action(
                         started.elapsed(),
                     );
                     exit_code = 1;
+                    if selection.fail_fast {
+                        break;
+                    }
                 }
             }
             Err(err) => return Err(err),
@@ -282,6 +325,226 @@ struct WorkspaceSelection {
     filter_name: Option<String>,
     changed_only: bool,
     since: Option<String>,
+    jobs: Option<usize>,
+    fail_fast: bool,
+    keep_going: bool,
+    order: cli::WorkspaceOrder,
+}
+
+struct WorkspaceRunOptions<'a> {
+    command_name: &'a str,
+    args: &'a [String],
+    safe: bool,
+    json_output: bool,
+    jobs: usize,
+    keep_going: bool,
+    fail_fast: bool,
+    started: Instant,
+}
+
+fn order_workspace_projects(
+    mut projects: Vec<(PathBuf, config::ProjectConfig)>,
+    order: cli::WorkspaceOrder,
+) -> Vec<(PathBuf, config::ProjectConfig)> {
+    match order {
+        cli::WorkspaceOrder::Path => projects,
+        cli::WorkspaceOrder::Name => {
+            projects.sort_by(|left, right| {
+                let left_name = left.1.name.as_deref().unwrap_or("").to_ascii_lowercase();
+                let right_name = right.1.name.as_deref().unwrap_or("").to_ascii_lowercase();
+                left_name
+                    .cmp(&right_name)
+                    .then_with(|| left.0.cmp(&right.0))
+            });
+            projects
+        }
+    }
+}
+
+fn execute_workspace_projects(
+    projects: &[(PathBuf, config::ProjectConfig)],
+    options: WorkspaceRunOptions<'_>,
+) -> Result<i32, Error> {
+    let WorkspaceRunOptions {
+        command_name,
+        args,
+        safe,
+        json_output,
+        jobs,
+        keep_going,
+        fail_fast,
+        started,
+    } = options;
+    let project_entries = if json_output {
+        Some(
+            projects
+                .iter()
+                .map(|(path, config)| {
+                    json!({
+                        "config": path,
+                        "root": config.root,
+                        "name": config.name,
+                    })
+                })
+                .collect::<Vec<_>>(),
+        )
+    } else {
+        None
+    };
+
+    let mut exit_code = 0;
+    let mut executed = 0usize;
+
+    if jobs == 1 {
+        for (_, config) in projects.iter() {
+            executed += 1;
+            let started = Instant::now();
+            if !json_output {
+                let prefix = config
+                    .name
+                    .as_deref()
+                    .map(|name| format!("[{name}]"))
+                    .unwrap_or_else(|| format!("[{}]", config.root.display()));
+                println!("{prefix} workspace: {}", config.root.display());
+            }
+            let status = runner::execute(
+                Action::Exec(cli::ExecArgs {
+                    name: command_name.to_string(),
+                    args: args.to_vec(),
+                }),
+                config,
+                safe,
+                config.name.as_deref(),
+                json_output,
+            )?;
+            if !status.success() {
+                print_failure_summary(
+                    config.name.as_deref(),
+                    Some(command_name),
+                    status.code(),
+                    started.elapsed(),
+                );
+                exit_code = 1;
+                if fail_fast {
+                    break;
+                }
+            }
+        }
+    } else {
+        let queue = Arc::new(Mutex::new(VecDeque::from(projects.to_vec())));
+        let failed = Arc::new(AtomicBool::new(false));
+        let executed_count = Arc::new(AtomicUsize::new(0));
+        let mut handles = Vec::new();
+
+        for _ in 0..jobs {
+            let queue = Arc::clone(&queue);
+            let failed = Arc::clone(&failed);
+            let executed_count = Arc::clone(&executed_count);
+            let command_name = command_name.to_string();
+            let args = args.to_vec();
+            let handle = thread::spawn(move || {
+                let mut local_exit = 0;
+                loop {
+                    if fail_fast && failed.load(Ordering::SeqCst) {
+                        break;
+                    }
+
+                    let next = {
+                        let mut queue = queue.lock().expect("workspace queue");
+                        queue.pop_front()
+                    };
+
+                    let Some((_, config)) = next else {
+                        break;
+                    };
+
+                    executed_count.fetch_add(1, Ordering::SeqCst);
+                    let started = Instant::now();
+                    if !json_output {
+                        let prefix = config
+                            .name
+                            .as_deref()
+                            .map(|name| format!("[{name}]"))
+                            .unwrap_or_else(|| format!("[{}]", config.root.display()));
+                        println!("{prefix} workspace: {}", config.root.display());
+                    }
+
+                    match runner::execute(
+                        Action::Exec(cli::ExecArgs {
+                            name: command_name.clone(),
+                            args: args.clone(),
+                        }),
+                        &config,
+                        safe,
+                        config.name.as_deref(),
+                        json_output,
+                    ) {
+                        Ok(status) => {
+                            if !status.success() {
+                                print_failure_summary(
+                                    config.name.as_deref(),
+                                    Some(command_name.as_str()),
+                                    status.code(),
+                                    started.elapsed(),
+                                );
+                                local_exit = 1;
+                                failed.store(true, Ordering::SeqCst);
+                            }
+                        }
+                        Err(err) => {
+                            failed.store(true, Ordering::SeqCst);
+                            local_exit = 1;
+                            eprintln!(
+                                "[mbr] failed: project={} | command={} | error={}",
+                                config.name.as_deref().unwrap_or("(unnamed)"),
+                                command_name,
+                                err
+                            );
+                        }
+                    }
+
+                    if local_exit != 0 && !keep_going {
+                        break;
+                    }
+                }
+
+                local_exit
+            });
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            match handle.join() {
+                Ok(status) => {
+                    if status != 0 {
+                        exit_code = 1;
+                    }
+                }
+                Err(_) => {
+                    exit_code = 1;
+                }
+            }
+        }
+
+        executed = executed_count.load(Ordering::SeqCst);
+    }
+
+    if let Some(projects) = project_entries {
+        print_stable_json(json_envelope(
+            "workspace",
+            if exit_code == 0 { "ok" } else { "error" },
+            vec![("projects", json!(projects))],
+        ));
+    }
+
+    print_command_summary(
+        &format!("workspace {command_name}"),
+        exit_code == 0,
+        executed,
+        started.elapsed(),
+    );
+
+    Ok(exit_code)
 }
 
 fn collect_workspace_projects(

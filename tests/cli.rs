@@ -1981,6 +1981,106 @@ fn workspace_runs_command_in_each_project() {
 }
 
 #[test]
+fn workspace_jobs_runs_projects_concurrently() {
+    let temp = TempDir::new().expect("temp dir");
+    let first = mkdir(temp.path(), "first");
+    let second = mkdir(temp.path(), "second");
+    write_config(
+        &first,
+        &format!(
+            "[project]\nname = \"first\"\n[commands]\nbuild = {}\n",
+            sleep_and_print_command_spec("first-ok")
+        ),
+    );
+    write_config(
+        &second,
+        &format!(
+            "[project]\nname = \"second\"\n[commands]\nbuild = {}\n",
+            sleep_and_print_command_spec("second-ok")
+        ),
+    );
+
+    let started = std::time::Instant::now();
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["workspace", "--jobs", "2", "build"])
+        .assert()
+        .success();
+
+    assert!(started.elapsed() < std::time::Duration::from_secs(4));
+}
+
+#[test]
+fn workspace_fail_fast_stops_after_first_failure() {
+    let temp = TempDir::new().expect("temp dir");
+    let first = mkdir(temp.path(), "first");
+    let second = mkdir(temp.path(), "second");
+    write_config(
+        &first,
+        &format!(
+            "[project]\nname = \"first\"\n[commands]\nbuild = {}\n",
+            failing_command_spec("first-fail", 7)
+        ),
+    );
+    write_config(
+        &second,
+        &format!(
+            "[project]\nname = \"second\"\n[commands]\nbuild = {}\n",
+            print_command_spec("second-ok")
+        ),
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["workspace", "--fail-fast", "build"])
+        .assert()
+        .failure()
+        .stdout(contains("first-fail"))
+        .stdout(predicates::str::contains("second-ok").not())
+        .stderr(contains(
+            "[mbr] summary: command=workspace build status=warn count=1",
+        ));
+}
+
+#[test]
+fn workspace_order_name_changes_execution_order() {
+    let temp = TempDir::new().expect("temp dir");
+    let zeta_dir = mkdir(temp.path(), "zzz");
+    let alpha_dir = mkdir(temp.path(), "aaa");
+    write_config(
+        &zeta_dir,
+        &format!(
+            "[project]\nname = \"zeta\"\n[commands]\nbuild = {}\n",
+            print_command_spec("zeta-ok")
+        ),
+    );
+    write_config(
+        &alpha_dir,
+        &format!(
+            "[project]\nname = \"alpha\"\n[commands]\nbuild = {}\n",
+            print_command_spec("alpha-ok")
+        ),
+    );
+
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["workspace", "--order", "name", "build"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8(output).expect("utf8 output");
+    let alpha_pos = stdout.find("alpha-ok").expect("alpha output");
+    let zeta_pos = stdout.find("zeta-ok").expect("zeta output");
+    assert!(alpha_pos < zeta_pos);
+}
+
+#[test]
 fn workspace_json_has_stable_envelope() {
     let temp = TempDir::new().expect("temp dir");
     let first = mkdir(temp.path(), "first");

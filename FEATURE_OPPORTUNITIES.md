@@ -5,7 +5,7 @@
 1. [x] `init --import`
 Generate `.mbr.toml` from existing project files like `Cargo.toml`, `package.json`, `pyproject.toml`, `Makefile`, and `justfile`.
 
-2. Workspace controls
+2. [x] Workspace controls
 Add `workspace --jobs <n>`, `--fail-fast`, `--keep-going`, and ordered execution options.
 
 3. `watch` mode

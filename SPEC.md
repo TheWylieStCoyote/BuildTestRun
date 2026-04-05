@@ -78,6 +78,10 @@ If `[project].name` is missing, execution should warn that command trust is lowe
 If a project-root `.env` file exists, its values should be loaded before execution.
 Commands may define `retries` to retry failed runs.
 `mbr workspace --list` should list discovered projects, `mbr workspace --name <project> --list` should filter by project name, `mbr workspace --changed-only` should filter to changed projects, `mbr workspace --changed-only --since <ref>` should use the given git base, and `mbr workspace --name <project> <name>` should run a named command in each matching discovered project.
+`mbr workspace --jobs <n>` should run discovered projects concurrently.
+`mbr workspace --fail-fast` should stop scheduling new workspace jobs after the first failure.
+`mbr workspace --keep-going` should continue scheduling remaining workspace jobs after failures.
+`mbr workspace --order name` should order workspace execution by project name instead of discovery path.
 Workspace and parallel output should be prefixed with the project or command name so multi-target runs stay readable.
 Failed workspace, parallel, and release commands should print a short summary with the target, exit code, and duration.
 `mbr package` should archive the configured project root into a local tarball or zip file.

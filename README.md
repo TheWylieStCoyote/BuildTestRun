@@ -32,6 +32,8 @@ mbr explain build
 mbr --workspace workspace build
 mbr workspace --name api build
 mbr workspace --changed-only build
+mbr workspace --jobs 4 build
+mbr workspace --fail-fast build
 mbr parallel fmt lint test
 mbr workspace --list
 mbr workspace build
@@ -97,6 +99,9 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - JSON output now uses a stable envelope with `status` and `command`
 - Supports `--workspace <path>` to run from a nested project root
 - Runs multiple named commands concurrently with `mbr parallel <name>...`
+- Supports workspace concurrency with `mbr workspace --jobs <n>`
+- Supports workspace failure policies with `--fail-fast` and `--keep-going`
+- Supports workspace ordering with `--order name`
 - Supports pipeline commands with `steps = ["fmt", "lint", "test"]`
 - Prefixes workspace and parallel output with the project or command name
 - Prints failure summaries with exit code, target, and duration

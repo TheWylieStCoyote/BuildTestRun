@@ -155,6 +155,18 @@ pub struct WorkspaceArgs {
     #[arg(long)]
     pub changed_only: bool,
 
+    #[arg(long, value_name = "N")]
+    pub jobs: Option<usize>,
+
+    #[arg(long)]
+    pub fail_fast: bool,
+
+    #[arg(long)]
+    pub keep_going: bool,
+
+    #[arg(long, value_enum, default_value_t = WorkspaceOrder::Path)]
+    pub order: WorkspaceOrder,
+
     #[arg(long, value_name = "REF")]
     pub since: Option<String>,
 
@@ -165,6 +177,12 @@ pub struct WorkspaceArgs {
 
     #[arg(value_name = "ARGS", last = true, allow_hyphen_values = true)]
     pub args: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum WorkspaceOrder {
+    Path,
+    Name,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Args)]
