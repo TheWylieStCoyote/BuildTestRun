@@ -88,6 +88,7 @@ Commands may define `retries` to retry failed runs.
 `[requirements]` should support `tools`, `files`, and `env` lists that `doctor` validates directly, and profile requirements should merge into the selected config.
 `[trust].shell_commands` should explicitly opt in to shell-based commands, and `doctor` should warn when shell commands are present without that opt-in.
 `--json-events` should stream structured progress events to stderr for long-running `workspace`, `parallel`, and `release` runs while preserving the final JSON envelope on stdout.
+`--log-dir <path>` should save each command's stdout and stderr to log files without changing terminal behavior.
 `mbr watch <command>` should rerun the selected command when files change.
 `mbr watch workspace ...` should rerun workspace commands on file changes.
 `mbr watch --once` should run a single cycle and exit, which is useful for tests and scripting.

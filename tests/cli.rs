@@ -1463,6 +1463,39 @@ fn command_timeout_fails_cleanly() {
 }
 
 #[test]
+fn log_dir_writes_command_output() {
+    let temp = TempDir::new().expect("temp dir");
+    let logs = mkdir(temp.path(), "logs");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = { command = "sh -c 'echo log-out; echo log-err >&2'" }
+"#,
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["--log-dir", logs.to_str().expect("logs path"), "build"])
+        .assert()
+        .success()
+        .stdout(contains("log-out"))
+        .stderr(contains("log-err"));
+
+    let files: Vec<_> = fs::read_dir(&logs)
+        .expect("log dir entries")
+        .map(|entry| entry.expect("log file").path())
+        .collect();
+    let stdout_log = files
+        .iter()
+        .find(|path| path.to_string_lossy().contains("stdout"))
+        .expect("stdout log");
+    let contents = fs::read_to_string(stdout_log).expect("read stdout log");
+    assert!(contents.contains("log-out"));
+}
+
+#[test]
 fn workspace_override_is_respected() {
     let temp = TempDir::new().expect("temp dir");
     let workspace = mkdir(temp.path(), "workspace");

@@ -5,11 +5,13 @@ use crate::{
 };
 use std::{
     borrow::Cow,
+    fs,
+    fs::OpenOptions,
     io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
     process::{Command, ExitStatus, Stdio},
     thread,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 pub fn execute(
@@ -18,6 +20,7 @@ pub fn execute(
     safe: bool,
     prefix: Option<&str>,
     json_output: bool,
+    log_dir: Option<&PathBuf>,
 ) -> Result<ExitStatus, Error> {
     let (command_name, args, action_label) = match action {
         Action::Build(CommandArgs { args }) => ("build".to_string(), args, "build".to_string()),
@@ -58,6 +61,7 @@ pub fn execute(
         safe,
         prefix,
         json_output,
+        log_dir,
     )
 }
 
@@ -90,6 +94,7 @@ fn unknown_command_error(name: &str) -> Error {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_named_command(
     command_name: &str,
     args: &[String],
@@ -98,6 +103,7 @@ fn run_named_command(
     safe: bool,
     prefix: Option<&str>,
     json_output: bool,
+    log_dir: Option<&PathBuf>,
 ) -> Result<ExitStatus, Error> {
     let command = config
         .commands
@@ -131,6 +137,7 @@ fn run_named_command(
                 safe,
                 prefix,
                 json_output,
+                log_dir,
             )?);
         }
 
@@ -144,10 +151,12 @@ fn run_named_command(
         let result = run_command_once(
             command,
             args,
+            command_name,
             &config.root,
             &config.env,
             prefix,
             json_output,
+            log_dir,
         );
         match result {
             Ok(status) if status.success() => return Ok(status),
@@ -165,23 +174,30 @@ fn run_named_command(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_command_once(
     command: &CommandSpec,
     extra_args: &[String],
+    command_name: &str,
     root: &Path,
     project_env: &std::collections::HashMap<String, String>,
     prefix: Option<&str>,
     json_output: bool,
+    log_dir: Option<&PathBuf>,
 ) -> Result<ExitStatus, Error> {
     let mut cmd = build_command(command, extra_args);
     cmd.current_dir(resolve_workdir(root, command.cwd()));
     cmd.stdin(Stdio::inherit());
-    if json_output {
-        cmd.stdout(Stdio::null());
-        cmd.stderr(Stdio::null());
-    } else if prefix.is_some() {
+    let capture_output = prefix.is_some() || log_dir.is_some();
+    if let Some(log_dir) = log_dir {
+        fs::create_dir_all(log_dir).map_err(|source| Error::Execution(source.to_string()))?;
+    }
+    if capture_output {
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
+    } else if json_output {
+        cmd.stdout(Stdio::null());
+        cmd.stderr(Stdio::null());
     } else {
         cmd.stdout(Stdio::inherit());
         cmd.stderr(Stdio::inherit());
@@ -195,13 +211,29 @@ fn run_command_once(
         .spawn()
         .map_err(|source| Error::Execution(source.to_string()))?;
 
-    if let Some(prefix) = prefix {
+    if capture_output {
+        let log_paths = log_dir.map(|dir| command_log_paths(dir, command_name));
+        let emit_terminal = !json_output;
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
-        let stdout_thread =
-            stdout.map(|stream| spawn_prefixed_reader(stream, prefix.to_string(), false));
-        let stderr_thread =
-            stderr.map(|stream| spawn_prefixed_reader(stream, prefix.to_string(), true));
+        let stdout_thread = stdout.map(|stream| {
+            spawn_output_reader(
+                stream,
+                prefix.map(|value| value.to_string()),
+                emit_terminal,
+                false,
+                log_paths.as_ref().map(|(stdout, _)| stdout.clone()),
+            )
+        });
+        let stderr_thread = stderr.map(|stream| {
+            spawn_output_reader(
+                stream,
+                prefix.map(|value| value.to_string()),
+                emit_terminal,
+                true,
+                log_paths.as_ref().map(|(_, stderr)| stderr.clone()),
+            )
+        });
 
         let status = match command.timeout() {
             Some(timeout_secs) => wait_with_timeout(&mut child, Duration::from_secs(timeout_secs)),
@@ -228,23 +260,66 @@ fn run_command_once(
     }
 }
 
-fn spawn_prefixed_reader<R: std::io::Read + Send + 'static>(
+fn spawn_output_reader<R: std::io::Read + Send + 'static>(
     reader: R,
-    prefix: String,
+    prefix: Option<String>,
+    emit_terminal: bool,
     is_err: bool,
+    log_path: Option<PathBuf>,
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         let reader = BufReader::new(reader);
+        let mut log_file =
+            log_path.and_then(|path| OpenOptions::new().create(true).append(true).open(path).ok());
         for line in reader.lines().map_while(Result::ok) {
-            if is_err {
+            if let Some(file) = log_file.as_mut() {
+                let _ = writeln!(file, "{line}");
+            }
+            if emit_terminal && is_err {
                 let mut handle = std::io::stderr().lock();
-                let _ = writeln!(handle, "[{prefix}] {line}");
-            } else {
+                match prefix.as_deref() {
+                    Some(prefix) => {
+                        let _ = writeln!(handle, "[{prefix}] {line}");
+                    }
+                    None => {
+                        let _ = writeln!(handle, "{line}");
+                    }
+                }
+            } else if emit_terminal {
                 let mut handle = std::io::stdout().lock();
-                let _ = writeln!(handle, "[{prefix}] {line}");
+                match prefix.as_deref() {
+                    Some(prefix) => {
+                        let _ = writeln!(handle, "[{prefix}] {line}");
+                    }
+                    None => {
+                        let _ = writeln!(handle, "{line}");
+                    }
+                }
             }
         }
     })
+}
+
+fn command_log_paths(log_dir: &Path, command_name: &str) -> (PathBuf, PathBuf) {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or_default();
+    let safe_name = command_name
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+                ch
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>();
+    let base = format!("{safe_name}-{stamp}");
+    (
+        log_dir.join(format!("{base}.stdout.log")),
+        log_dir.join(format!("{base}.stderr.log")),
+    )
 }
 
 fn build_command(command: &CommandSpec, extra_args: &[String]) -> Command {

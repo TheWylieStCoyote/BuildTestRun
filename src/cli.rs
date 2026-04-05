@@ -294,6 +294,9 @@ pub struct Cli {
     #[arg(long = "json-events")]
     pub json_events: bool,
 
+    #[arg(long, value_name = "DIR")]
+    pub log_dir: Option<PathBuf>,
+
     #[arg(long, value_name = "NAME")]
     pub profile: Option<String>,
 

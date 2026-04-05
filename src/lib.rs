@@ -76,18 +76,25 @@ pub fn run_from_args() -> Result<i32, Error> {
             args.args,
             cli.json,
             cli.json_events,
+            cli.log_dir.clone(),
             cli.safe,
             cli.profile.as_deref(),
         ),
-        Action::Watch(args) => {
-            watch_action(&start_dir, args, cli.json, cli.safe, cli.profile.as_deref())
-        }
+        Action::Watch(args) => watch_action(
+            &start_dir,
+            args,
+            cli.json,
+            cli.safe,
+            cli.log_dir.clone(),
+            cli.profile.as_deref(),
+        ),
         Action::Package(args) => package_action(&start_dir, args.output, cli.json),
         Action::Release(args) => release_action(
             &start_dir,
             args.output,
             cli.json,
             cli.json_events,
+            cli.log_dir.clone(),
             cli.profile.as_deref(),
         ),
         Action::Completions(args) => completions_action(args.shell),
@@ -128,6 +135,7 @@ pub fn run_from_args() -> Result<i32, Error> {
             cli.json_events,
             cli.dry_run,
             cli.safe,
+            cli.log_dir.clone(),
             cli.profile.as_deref(),
         ),
         action => {
@@ -140,7 +148,13 @@ pub fn run_from_args() -> Result<i32, Error> {
                     cli.profile.as_deref(),
                 )
             } else {
-                run_action(action, &start_dir, cli.safe, cli.profile.as_deref())
+                run_action(
+                    action,
+                    &start_dir,
+                    cli.safe,
+                    cli.log_dir.clone(),
+                    cli.profile.as_deref(),
+                )
             }
         }
     }
@@ -150,11 +164,12 @@ pub fn run_action(
     action: Action,
     start_dir: &Path,
     safe: bool,
+    log_dir: Option<PathBuf>,
     profile: Option<&str>,
 ) -> Result<i32, Error> {
     let (_, config) = load_project(start_dir, profile)?;
     let started = Instant::now();
-    let status = runner::execute(action.clone(), &config, safe, None, false)?;
+    let status = runner::execute(action.clone(), &config, safe, None, false, log_dir.as_ref())?;
     if !status.success() {
         print_failure_summary(
             None,
@@ -175,6 +190,7 @@ pub(crate) fn workspace_action(
     args: Vec<String>,
     json_output: bool,
     json_events: bool,
+    log_dir: Option<PathBuf>,
     safe: bool,
     profile: Option<&str>,
 ) -> Result<i32, Error> {
@@ -258,6 +274,7 @@ pub(crate) fn workspace_action(
                 safe,
                 json_output,
                 json_events,
+                log_dir: log_dir.as_ref(),
                 jobs,
                 keep_going: selection.keep_going || !selection.fail_fast,
                 fail_fast: selection.fail_fast,
@@ -313,6 +330,7 @@ pub(crate) fn workspace_action(
             safe,
             config.name.as_deref(),
             json_output,
+            log_dir.as_ref(),
         ) {
             Ok(status) => {
                 emit_json_event(
@@ -379,6 +397,7 @@ struct WorkspaceRunOptions<'a> {
     safe: bool,
     json_output: bool,
     json_events: bool,
+    log_dir: Option<&'a PathBuf>,
     jobs: usize,
     keep_going: bool,
     fail_fast: bool,
@@ -414,6 +433,7 @@ fn execute_workspace_projects(
         safe,
         json_output,
         json_events,
+        log_dir,
         jobs,
         keep_going,
         fail_fast,
@@ -469,6 +489,7 @@ fn execute_workspace_projects(
                 safe,
                 config.name.as_deref(),
                 json_output,
+                log_dir,
             )?;
             emit_json_event(
                 json_events,
@@ -506,6 +527,7 @@ fn execute_workspace_projects(
             let executed_count = Arc::clone(&executed_count);
             let command_name = command_name.to_string();
             let args = args.to_vec();
+            let log_dir = log_dir.cloned();
             let handle = thread::spawn(move || {
                 let mut local_exit = 0;
                 loop {
@@ -551,6 +573,7 @@ fn execute_workspace_projects(
                         safe,
                         config.name.as_deref(),
                         json_output,
+                        log_dir.as_ref(),
                     ) {
                         Ok(status) => {
                             emit_json_event(
@@ -636,6 +659,7 @@ pub(crate) fn watch_action(
     args: cli::WatchArgs,
     json_output: bool,
     safe: bool,
+    log_dir: Option<PathBuf>,
     profile: Option<&str>,
 ) -> Result<i32, Error> {
     let interval = Duration::from_millis(args.poll_interval.max(1));
@@ -648,6 +672,7 @@ pub(crate) fn watch_action(
                 start_dir,
                 json_output,
                 safe,
+                log_dir.as_ref(),
                 profile,
             )?,
             cli::WatchAction::Test(command_args) => run_watch_command(
@@ -655,6 +680,7 @@ pub(crate) fn watch_action(
                 start_dir,
                 json_output,
                 safe,
+                log_dir.as_ref(),
                 profile,
             )?,
             cli::WatchAction::Run(command_args) => run_watch_command(
@@ -662,6 +688,7 @@ pub(crate) fn watch_action(
                 start_dir,
                 json_output,
                 safe,
+                log_dir.as_ref(),
                 profile,
             )?,
             cli::WatchAction::Dev(command_args) => run_watch_command(
@@ -669,6 +696,7 @@ pub(crate) fn watch_action(
                 start_dir,
                 json_output,
                 safe,
+                log_dir.as_ref(),
                 profile,
             )?,
             cli::WatchAction::Fmt(command_args) => run_watch_command(
@@ -676,6 +704,7 @@ pub(crate) fn watch_action(
                 start_dir,
                 json_output,
                 safe,
+                log_dir.as_ref(),
                 profile,
             )?,
             cli::WatchAction::Clean(command_args) => run_watch_command(
@@ -683,6 +712,7 @@ pub(crate) fn watch_action(
                 start_dir,
                 json_output,
                 safe,
+                log_dir.as_ref(),
                 profile,
             )?,
             cli::WatchAction::Ci(command_args) => run_watch_command(
@@ -690,6 +720,7 @@ pub(crate) fn watch_action(
                 start_dir,
                 json_output,
                 safe,
+                log_dir.as_ref(),
                 profile,
             )?,
             cli::WatchAction::Workspace(workspace_args) => workspace_action(
@@ -709,6 +740,7 @@ pub(crate) fn watch_action(
                 workspace_args.args.clone(),
                 json_output,
                 false,
+                log_dir.clone(),
                 safe,
                 profile,
             )?,
@@ -733,9 +765,10 @@ fn run_watch_command(
     start_dir: &Path,
     _json_output: bool,
     safe: bool,
+    log_dir: Option<&PathBuf>,
     profile: Option<&str>,
 ) -> Result<i32, Error> {
-    run_action(action, start_dir, safe, profile)
+    run_action(action, start_dir, safe, log_dir.cloned(), profile)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -2032,6 +2065,7 @@ pub fn release_action(
     output: Option<PathBuf>,
     json_output: bool,
     json_events: bool,
+    log_dir: Option<PathBuf>,
     profile: Option<&str>,
 ) -> Result<i32, Error> {
     let (_, config) = load_project(start_dir, profile)?;
@@ -2051,7 +2085,7 @@ pub fn release_action(
                 ("root", json!(config.root.clone())),
             ],
         );
-        let status = runner::execute(action, &config, false, None, json_output)?;
+        let status = runner::execute(action, &config, false, None, json_output, log_dir.as_ref())?;
         emit_json_event(
             json_events,
             "release_stage_finish",
@@ -2515,6 +2549,7 @@ pub fn dry_run_action(
     Ok(0)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn parallel_action(
     start_dir: &Path,
     names: Vec<String>,
@@ -2522,6 +2557,7 @@ pub fn parallel_action(
     json_events: bool,
     dry_run: bool,
     safe: bool,
+    log_dir: Option<PathBuf>,
     profile: Option<&str>,
 ) -> Result<i32, Error> {
     let (_, config) = load_project(start_dir, profile)?;
@@ -2571,6 +2607,7 @@ pub fn parallel_action(
     for name in names.clone() {
         let config = config.clone();
         let label = name.clone();
+        let log_dir = log_dir.clone();
         handles.push(thread::spawn(move || {
             let started = Instant::now();
             emit_json_event(
@@ -2590,6 +2627,7 @@ pub fn parallel_action(
                 safe,
                 Some(label.as_str()),
                 json_output,
+                log_dir.as_ref(),
             )
             .map(|status| {
                 emit_json_event(

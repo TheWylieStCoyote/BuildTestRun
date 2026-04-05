@@ -38,6 +38,7 @@ mbr workspace --jobs 4 build
 mbr workspace --fail-fast build
 mbr watch --once build
 mbr parallel fmt lint test
+mbr --log-dir logs build
 mbr workspace --list
 mbr workspace build
 mbr package --output demo.tar.gz
@@ -111,6 +112,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Supports `[requirements]` for required tools, files, and env vars
 - Supports `[trust].shell_commands` to explicitly allow shell-based commands
 - Supports `--json-events` for streaming orchestration progress to stderr
+- Supports `--log-dir` for saving command output to files
 - Supports pipeline commands with `steps = ["fmt", "lint", "test"]`
 - Prefixes workspace and parallel output with the project or command name
 - Prints failure summaries with exit code, target, and duration
