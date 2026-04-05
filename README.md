@@ -26,6 +26,7 @@ mbr templates
 mbr list
 mbr list --verbose
 mbr which
+mbr schema
 mbr doctor --strict
 mbr show build
 mbr show --tree build
@@ -92,6 +93,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Prints starter configs with `mbr init --print`
 - Interactive init can add template-specific optional commands and safe structured-only mode
 - Lists starter templates with `mbr templates` or `mbr init --list-templates`
+- Prints a JSON schema for `.mbr.toml` with `mbr schema`
 - Supports custom template files or directories with `mbr init --template-file <path>`
 - Interactive init can add optional command stubs and enable safe structured-only mode
 - Starter templates include rust, node, pnpm, yarn, bun, deno, nextjs, vite, turbo, nx, python, django, fastapi, flask, poetry, hatch, pixi, uv, go, cargo-workspace, java-gradle, java-maven, kotlin-gradle, dotnet, php-composer, ruby-bundler, rails, laravel, terraform, helm, docker-compose, cmake, cmake-ninja, and generic

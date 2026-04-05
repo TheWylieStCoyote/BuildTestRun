@@ -27,7 +27,7 @@ Keep stable final JSON envelopes, but add optional streaming events for long-run
 - [x] Project tags or selectors for workspace filtering
 - [x] A `show --tree` or graph view for inheritance and pipelines
 - [x] `--log-dir` for saved command output
-- Editor-friendly schema or completion support for `.mbr.toml`
+- [x] Editor-friendly schema or completion support for `.mbr.toml`
 - Named command parameters beyond raw passthrough args
 
 ## Avoid For Now

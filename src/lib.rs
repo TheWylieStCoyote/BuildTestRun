@@ -98,6 +98,7 @@ pub fn run_from_args() -> Result<i32, Error> {
             cli.profile.as_deref(),
         ),
         Action::Completions(args) => completions_action(args.shell),
+        Action::Schema => schema_action(),
         Action::Manpage => manpage_action(),
         Action::List(args) => {
             list_action(&start_dir, cli.json, args.verbose, cli.profile.as_deref())
@@ -2145,6 +2146,121 @@ pub fn completions_action(shell: cli::CompletionShell) -> Result<i32, Error> {
     Ok(0)
 }
 
+pub fn schema_action() -> Result<i32, Error> {
+    let schema = mbr_schema();
+    serde_json::to_writer_pretty(std::io::stdout(), &schema)
+        .map_err(|source| Error::Execution(source.to_string()))?;
+    println!();
+    Ok(0)
+}
+
+fn mbr_schema() -> Value {
+    json!({
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://example.com/mbr.schema.json",
+        "title": "mbr configuration",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+            "project": { "$ref": "#/$defs/project" },
+            "env": { "type": "object", "additionalProperties": { "type": "string" } },
+            "env_file": { "type": "string" },
+            "trust": { "$ref": "#/$defs/trust" },
+            "requirements": { "$ref": "#/$defs/requirements" },
+            "profiles": {
+                "type": "object",
+                "additionalProperties": { "$ref": "#/$defs/profile" }
+            },
+            "commands": { "$ref": "#/$defs/commands" }
+        },
+        "$defs": {
+            "project": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "name": { "type": "string" },
+                    "root": { "type": "string" },
+                    "tags": { "type": "array", "items": { "type": "string" } }
+                }
+            },
+            "trust": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "shell_commands": { "type": "boolean", "default": false }
+                }
+            },
+            "requirements": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "tools": { "type": "array", "items": { "type": "string" } },
+                    "files": { "type": "array", "items": { "type": "string" } },
+                    "env": { "type": "array", "items": { "type": "string" } }
+                }
+            },
+            "profile": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "env": { "type": "object", "additionalProperties": { "type": "string" } },
+                    "env_file": { "type": "string" },
+                    "trust": { "$ref": "#/$defs/trust" },
+                    "requirements": { "$ref": "#/$defs/requirements" },
+                    "commands": { "$ref": "#/$defs/commands" }
+                }
+            },
+            "commands": {
+                "type": "object",
+                "additionalProperties": { "$ref": "#/$defs/command" },
+                "properties": {
+                    "build": { "$ref": "#/$defs/command" },
+                    "test": { "$ref": "#/$defs/command" },
+                    "run": { "$ref": "#/$defs/command" }
+                }
+            },
+            "command": {
+                "oneOf": [
+                    { "type": "string" },
+                    {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "command": { "type": "string" },
+                            "program": { "type": "string" },
+                            "steps": { "type": "array", "items": { "type": "string" } },
+                            "extends": { "type": "string" },
+                            "args_mode": { "enum": ["append", "replace"] },
+                            "env_mode": { "enum": ["merge", "replace"] },
+                            "args": { "type": "array", "items": { "type": "string" } },
+                            "env": { "type": "object", "additionalProperties": { "type": "string" } },
+                            "cwd": { "type": "string" },
+                            "timeout": { "type": "integer", "minimum": 0 },
+                            "retries": { "type": "integer", "minimum": 0 },
+                            "description": { "type": "string" },
+                            "windows": { "$ref": "#/$defs/override" },
+                            "unix": { "$ref": "#/$defs/override" }
+                        }
+                    }
+                ]
+            },
+            "override": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "command": { "type": "string" },
+                    "program": { "type": "string" },
+                    "steps": { "type": "array", "items": { "type": "string" } },
+                    "args_mode": { "enum": ["append", "replace"] },
+                    "env_mode": { "enum": ["merge", "replace"] },
+                    "args": { "type": "array", "items": { "type": "string" } },
+                    "env": { "type": "object", "additionalProperties": { "type": "string" } }
+                }
+            }
+        }
+    })
+}
+
 pub fn manpage_action() -> Result<i32, Error> {
     let command = Cli::command();
     let man = clap_mangen::Man::new(command);
@@ -3147,6 +3263,7 @@ fn action_command(action: &Action) -> (String, Vec<String>) {
         | Action::Package(_)
         | Action::Release(_)
         | Action::Completions(_)
+        | Action::Schema
         | Action::Manpage
         | Action::List(_)
         | Action::Which

@@ -20,6 +20,7 @@ pub enum Action {
     Package(PackageArgs),
     Release(ReleaseArgs),
     Completions(CompletionsArgs),
+    Schema,
     Manpage,
     List(ListArgs),
     Which,
@@ -86,6 +87,7 @@ impl fmt::Display for Action {
             Action::Package(_) => f.write_str("package"),
             Action::Release(_) => f.write_str("release"),
             Action::Completions(_) => f.write_str("completions"),
+            Action::Schema => f.write_str("schema"),
             Action::Manpage => f.write_str("manpage"),
             Action::List(_) => f.write_str("list"),
             Action::Which => f.write_str("which"),
@@ -230,6 +232,9 @@ pub struct ReleaseArgs {
 pub struct CompletionsArgs {
     pub shell: CompletionShell,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Args)]
+pub struct SchemaArgs {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum CompletionShell {

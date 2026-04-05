@@ -14,6 +14,7 @@ mbr init
 mbr templates
 mbr list
 mbr which
+mbr schema
 mbr doctor
 mbr show <name>
 mbr --workspace <path>
@@ -60,6 +61,7 @@ Rendered init templates should be validated before writing.
 `mbr show --tree <command>` should print the command inheritance and pipeline tree for the selected command.
 `mbr explain <command>` should print the command type, resolution details, and the same source provenance.
 `mbr which` should show the resolved config path, project root, config chain, and selected profile.
+`mbr schema` should print a JSON Schema document for `.mbr.toml` so editors can provide validation and completion.
 JSON output should use a stable envelope with `status`, `command`, and command-specific fields.
 `mbr doctor` should report missing commands and PATH issues, and suggest fixes for missing tools and env files.
 `mbr doctor --fix` should create any missing configured env files it can safely create.

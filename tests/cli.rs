@@ -2559,6 +2559,24 @@ fn manpage_prints_manual_page() {
 }
 
 #[test]
+fn schema_prints_json_schema() {
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .arg("schema")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let schema: Value = serde_json::from_slice(&output).expect("schema json");
+    assert_eq!(schema["title"], "mbr configuration");
+    assert!(schema["properties"]["commands"].is_object());
+    assert!(schema["properties"]["requirements"].is_object());
+    assert!(schema["$defs"]["command"].is_object());
+}
+
+#[test]
 fn warns_when_project_name_is_missing() {
     let temp = TempDir::new().expect("temp dir");
     write_config(

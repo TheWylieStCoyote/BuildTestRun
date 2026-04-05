@@ -39,6 +39,7 @@ pub fn execute(
         | Action::Package(_)
         | Action::Release(_)
         | Action::Completions(_)
+        | Action::Schema
         | Action::Manpage
         | Action::List(_)
         | Action::Which
