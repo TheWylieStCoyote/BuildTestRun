@@ -2589,6 +2589,45 @@ ci = { steps = ["fmt", "lint"] }
 }
 
 #[test]
+fn show_prints_command_tree() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+base = { program = "cargo", args = ["build"] }
+build = { extends = "base", description = "Child build" }
+fmt = { program = "cargo", args = ["fmt"] }
+lint = { program = "cargo", args = ["clippy"] }
+ci = { steps = ["fmt", "lint"] }
+"#,
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["show", "--tree", "build"])
+        .assert()
+        .success()
+        .stdout(contains("tree:"))
+        .stdout(contains("- build"))
+        .stdout(contains("extends: base"))
+        .stdout(contains("- base"));
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["show", "--tree", "ci"])
+        .assert()
+        .success()
+        .stdout(contains("tree:"))
+        .stdout(contains("- ci"))
+        .stdout(contains("steps:"))
+        .stdout(contains("- fmt"))
+        .stdout(contains("- lint"));
+}
+
+#[test]
 fn doctor_flags_missing_common_commands() {
     let temp = TempDir::new().expect("temp dir");
     write_config(

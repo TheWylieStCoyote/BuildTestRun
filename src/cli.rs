@@ -266,6 +266,9 @@ pub struct ShowArgs {
     #[arg(long)]
     pub source: bool,
 
+    #[arg(long)]
+    pub tree: bool,
+
     pub name: String,
 
     #[arg(value_name = "ARGS", last = true, allow_hyphen_values = true)]

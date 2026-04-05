@@ -108,6 +108,7 @@ pub fn run_from_args() -> Result<i32, Error> {
             args.name,
             args.args,
             args.source,
+            args.tree,
             cli.json,
             cli.profile.as_deref(),
         ),
@@ -116,6 +117,7 @@ pub fn run_from_args() -> Result<i32, Error> {
             args.name,
             args.args,
             args.source,
+            args.tree,
             cli.json,
             cli.profile.as_deref(),
         ),
@@ -2273,10 +2275,20 @@ pub fn show_action(
     name: String,
     args: Vec<String>,
     source: bool,
+    tree: bool,
     json_output: bool,
     profile: Option<&str>,
 ) -> Result<i32, Error> {
-    describe_action(start_dir, name, args, source, json_output, false, profile)
+    describe_action(
+        start_dir,
+        name,
+        args,
+        source,
+        tree,
+        json_output,
+        false,
+        profile,
+    )
 }
 
 pub fn explain_action(
@@ -2284,17 +2296,29 @@ pub fn explain_action(
     name: String,
     args: Vec<String>,
     source: bool,
+    tree: bool,
     json_output: bool,
     profile: Option<&str>,
 ) -> Result<i32, Error> {
-    describe_action(start_dir, name, args, source, json_output, true, profile)
+    describe_action(
+        start_dir,
+        name,
+        args,
+        source,
+        tree,
+        json_output,
+        true,
+        profile,
+    )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn describe_action(
     start_dir: &Path,
     name: String,
     args: Vec<String>,
     source: bool,
+    tree: bool,
     json_output: bool,
     explain: bool,
     profile: Option<&str>,
@@ -2310,6 +2334,16 @@ fn describe_action(
         .map(|path| resolve_workdir(&config.root, Some(path)))
         .unwrap_or_else(|| config.root.clone());
     let sources = command_sources(start_dir, &config, command)?;
+    let tree_lines = if tree {
+        Some(command_tree_lines(
+            &config.raw_commands,
+            &name,
+            0,
+            &mut Vec::new(),
+        ))
+    } else {
+        None
+    };
 
     if json_output {
         let operation = if explain { "explain" } else { "show" };
@@ -2326,6 +2360,7 @@ fn describe_action(
                 ("description", json!(command.description())),
                 ("shell", json!(command.is_shell())),
                 ("pipeline", json!(command.is_pipeline())),
+                ("tree", json!(tree_lines)),
                 ("source", json!(source)),
                 ("sources", json!(sources)),
             ],
@@ -2333,6 +2368,12 @@ fn describe_action(
     } else {
         println!("name: {name}");
         println!("command: {rendered}");
+        if let Some(tree_lines) = tree_lines.as_ref() {
+            println!("tree:");
+            for line in tree_lines {
+                println!("{line}");
+            }
+        }
         if source {
             let config_chain = discovery::discover_config_chain(start_dir)?;
             println!(
@@ -2371,6 +2412,37 @@ fn describe_action(
     }
 
     Ok(0)
+}
+
+fn command_tree_lines(
+    commands: &config::CommandsSection,
+    name: &str,
+    depth: usize,
+    stack: &mut Vec<String>,
+) -> Vec<String> {
+    if stack.iter().any(|entry| entry == name) {
+        return vec![format!("{}- {name} (cycle)", "  ".repeat(depth))];
+    }
+
+    let Some(command) = commands.get(name) else {
+        return vec![format!("{}- {name} (missing)", "  ".repeat(depth))];
+    };
+
+    stack.push(name.to_string());
+    let mut lines = vec![format!("{}- {name}", "  ".repeat(depth))];
+
+    if let Some(base) = command.extends() {
+        lines.push(format!("{}  extends: {base}", "  ".repeat(depth)));
+        lines.extend(command_tree_lines(commands, base, depth + 1, stack));
+    } else if command.is_pipeline() {
+        lines.push(format!("{}  steps:", "  ".repeat(depth)));
+        for step in command.steps() {
+            lines.extend(command_tree_lines(commands, step, depth + 1, stack));
+        }
+    }
+
+    stack.pop();
+    lines
 }
 
 fn command_sources(

@@ -28,6 +28,7 @@ mbr list --verbose
 mbr which
 mbr doctor --strict
 mbr show build
+mbr show --tree build
 mbr explain build
 mbr --workspace workspace build
 mbr workspace --name api build
@@ -97,6 +98,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Lists commands and descriptions with `mbr list`
 - Shows resolved config with `mbr which`, including config chain and selected profile
 - Inspects a command with `mbr show <name>` and shows source provenance
+- Shows command inheritance and pipeline trees with `mbr show --tree <name>`
 - Explains a command with `mbr explain <name>` and shows source provenance
 - JSON output now uses a stable envelope with `status` and `command`
 - Supports `--workspace <path>` to run from a nested project root

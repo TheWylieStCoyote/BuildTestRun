@@ -460,6 +460,7 @@ pub struct ProjectConfig {
     pub selected_profile: Option<String>,
     pub profile_env_file: Option<String>,
     pub requirements: RequirementsSection,
+    pub raw_commands: CommandsSection,
     pub commands: CommandsSection,
 }
 
@@ -533,6 +534,7 @@ impl ProjectConfig {
             selected_profile,
         )?;
 
+        let raw_commands = commands.clone();
         commands = commands.resolve_inheritance()?;
 
         let root = root.ok_or_else(|| Error::ConfigNotFound {
@@ -567,6 +569,7 @@ impl ProjectConfig {
                 .and_then(|name| profiles.get(name))
                 .and_then(|profile| profile.env_file.clone()),
             requirements,
+            raw_commands,
             commands,
         })
     }
@@ -598,6 +601,7 @@ impl ProjectConfig {
             return Err(Error::MissingCommandGroup);
         }
         let mut commands = file.commands;
+        let raw_commands = commands.clone();
         let profile_name = selected_profile_name(None);
         let selected_profile_name = profile_name.clone();
         apply_selected_profile(
@@ -627,6 +631,7 @@ impl ProjectConfig {
                 .and_then(|name| file.profiles.get(name))
                 .and_then(|profile| profile.env_file.clone()),
             requirements,
+            raw_commands,
             commands: commands.resolve_inheritance()?,
         })
     }
