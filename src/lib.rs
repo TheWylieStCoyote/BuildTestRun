@@ -65,6 +65,7 @@ pub fn run_from_args() -> Result<i32, Error> {
             WorkspaceSelection {
                 command_name: args.command,
                 filter_name: args.name,
+                tags: args.tags,
                 changed_only: args.changed_only || args.since.is_some(),
                 since: args.since,
                 jobs: args.jobs,
@@ -177,8 +178,12 @@ pub(crate) fn workspace_action(
 ) -> Result<i32, Error> {
     let started = Instant::now();
     let projects = discovery::discover_project_paths(start_dir)?;
-    let projects =
-        collect_workspace_projects(&projects, profile, selection.filter_name.as_deref())?;
+    let projects = collect_workspace_projects(
+        &projects,
+        profile,
+        selection.filter_name.as_deref(),
+        &selection.tags,
+    )?;
     let projects = if selection.changed_only {
         filter_changed_workspace_projects(start_dir, projects, selection.since.as_deref())?
     } else {
@@ -357,6 +362,7 @@ pub(crate) fn workspace_action(
 struct WorkspaceSelection {
     command_name: Option<String>,
     filter_name: Option<String>,
+    tags: Vec<String>,
     changed_only: bool,
     since: Option<String>,
     jobs: Option<usize>,
@@ -690,6 +696,7 @@ pub(crate) fn watch_action(
                 WorkspaceSelection {
                     command_name: workspace_args.command.clone(),
                     filter_name: workspace_args.name.clone(),
+                    tags: workspace_args.tags.clone(),
                     changed_only: workspace_args.changed_only || workspace_args.since.is_some(),
                     since: workspace_args.since.clone(),
                     jobs: workspace_args.jobs,
@@ -780,6 +787,7 @@ fn collect_workspace_projects(
     projects: &[PathBuf],
     profile: Option<&str>,
     filter_name: Option<&str>,
+    filter_tags: &[String],
 ) -> Result<Vec<(PathBuf, config::ProjectConfig)>, Error> {
     let mut entries = Vec::new();
 
@@ -790,6 +798,14 @@ fn collect_workspace_projects(
         )?;
 
         if filter_name.is_some_and(|expected| config.name.as_deref() != Some(expected)) {
+            continue;
+        }
+
+        if !filter_tags.is_empty()
+            && !filter_tags
+                .iter()
+                .all(|tag| config.tags.iter().any(|existing| existing == tag))
+        {
             continue;
         }
 

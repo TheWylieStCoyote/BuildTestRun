@@ -2001,6 +2001,45 @@ fn workspace_filters_projects_by_name() {
 }
 
 #[test]
+fn workspace_filters_projects_by_tag() {
+    let temp = TempDir::new().expect("temp dir");
+    let first = mkdir(temp.path(), "first");
+    let second = mkdir(temp.path(), "second");
+    write_config(
+        &first,
+        &format!(
+            "[project]\nname = \"first\"\ntags = [\"web\", \"api\"]\n[commands]\nbuild = {}\n",
+            print_command_spec("first-ok")
+        ),
+    );
+    write_config(
+        &second,
+        &format!(
+            "[project]\nname = \"second\"\ntags = [\"cli\"]\n[commands]\nbuild = {}\n",
+            print_command_spec("second-ok")
+        ),
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["workspace", "--tag", "web", "--list"])
+        .assert()
+        .success()
+        .stdout(contains("name: first"))
+        .stdout(predicates::str::contains("name: second").not());
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["workspace", "--tag", "web", "--tag", "api", "--list"])
+        .assert()
+        .success()
+        .stdout(contains("name: first"))
+        .stdout(predicates::str::contains("name: second").not());
+}
+
+#[test]
 fn workspace_filters_projects_by_changed_files() {
     let temp = TempDir::new().expect("temp dir");
     let first = mkdir(temp.path(), "first");

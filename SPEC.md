@@ -68,6 +68,7 @@ Execution commands should print short end-of-run summaries with the target, stat
 `mbr show <name>` should display the resolved command, cwd, timeout, and description.
 `mbr --workspace <path>` should resolve the project starting from the given directory.
 `mbr parallel <name>...` should run multiple named commands concurrently.
+`mbr workspace --tag <tag>` should filter discovered projects by `[project].tags`, and multiple tags should require all listed tags to be present.
 Pipeline commands should support `steps = ["fmt", "lint", "test"]` and run each named step in order.
 `extends` on a command should inherit base fields and append arguments by default. Use `args_mode = "replace"` to replace inherited args, and `env_mode = "replace"` to replace inherited env.
 Set `MBR_PROFILE=<name>` to apply `[profiles.<name>]` overlays.

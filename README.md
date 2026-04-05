@@ -31,6 +31,7 @@ mbr show build
 mbr explain build
 mbr --workspace workspace build
 mbr workspace --name api build
+mbr workspace --tag web build
 mbr workspace --changed-only build
 mbr workspace --jobs 4 build
 mbr workspace --fail-fast build
@@ -103,6 +104,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Supports workspace concurrency with `mbr workspace --jobs <n>`
 - Supports workspace failure policies with `--fail-fast` and `--keep-going`
 - Supports workspace ordering with `--order name`
+- Supports workspace filtering with project tags via `--tag <tag>`
 - Supports `mbr watch` for repeated execution on file changes
 - Supports `[requirements]` for required tools, files, and env vars
 - Supports `[trust].shell_commands` to explicitly allow shell-based commands

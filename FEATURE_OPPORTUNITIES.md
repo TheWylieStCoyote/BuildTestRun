@@ -24,7 +24,7 @@ Keep stable final JSON envelopes, but add optional streaming events for long-run
 
 ## Nice To Have
 
-- Project tags or selectors for workspace filtering
+- [x] Project tags or selectors for workspace filtering
 - A `show --tree` or graph view for inheritance and pipelines
 - `--log-dir` for saved command output
 - Editor-friendly schema or completion support for `.mbr.toml`

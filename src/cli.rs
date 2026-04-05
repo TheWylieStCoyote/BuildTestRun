@@ -175,6 +175,9 @@ pub struct WorkspaceArgs {
     #[arg(long, value_name = "NAME")]
     pub name: Option<String>,
 
+    #[arg(long = "tag", value_name = "TAG")]
+    pub tags: Vec<String>,
+
     pub command: Option<String>,
 
     #[arg(value_name = "ARGS", last = true, allow_hyphen_values = true)]

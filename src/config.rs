@@ -28,6 +28,8 @@ pub struct ProjectFile {
 pub struct ProjectSection {
     pub name: Option<String>,
     pub root: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -451,6 +453,7 @@ impl CommandSpec {
 pub struct ProjectConfig {
     pub name: Option<String>,
     pub root: PathBuf,
+    pub tags: Vec<String>,
     pub env: HashMap<String, String>,
     pub env_file: Option<String>,
     pub trust: TrustSection,
@@ -479,6 +482,7 @@ impl ProjectConfig {
         let config_paths = discovery::discover_config_chain(start)?;
         let mut name = None;
         let mut root: Option<PathBuf> = None;
+        let mut tags = Vec::new();
         let mut env = HashMap::new();
         let mut commands = CommandsSection::default();
         let mut profiles: HashMap<String, ProfileSection> = HashMap::new();
@@ -501,6 +505,10 @@ impl ProjectConfig {
                     root = Some(resolve_root(project_dir, &value));
                 } else if root.is_none() {
                     root = Some(project_dir.to_path_buf());
+                }
+
+                if !project.tags.is_empty() {
+                    tags = merge_tags(tags, project.tags);
                 }
             } else if root.is_none() {
                 root = Some(project_dir.to_path_buf());
@@ -549,6 +557,7 @@ impl ProjectConfig {
         Ok(Self {
             name,
             root,
+            tags,
             env,
             env_file,
             trust,
@@ -568,6 +577,7 @@ impl ProjectConfig {
         let project = file.project.unwrap_or(ProjectSection {
             name: None,
             root: None,
+            tags: Vec::new(),
         });
 
         let root = match project.root {
@@ -607,6 +617,7 @@ impl ProjectConfig {
         Ok(Self {
             name: project.name,
             root,
+            tags: project.tags,
             env,
             env_file: file.env_file,
             trust,
@@ -639,6 +650,15 @@ fn resolve_root(project_dir: &Path, root: &str) -> PathBuf {
     } else {
         project_dir.join(root)
     }
+}
+
+fn merge_tags(mut current: Vec<String>, new_tags: Vec<String>) -> Vec<String> {
+    for tag in new_tags {
+        if !current.iter().any(|existing| existing == &tag) {
+            current.push(tag);
+        }
+    }
+    current
 }
 
 fn load_env_file(
