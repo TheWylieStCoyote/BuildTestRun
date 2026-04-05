@@ -804,6 +804,54 @@ build = { program = "definitely-not-on-path-12345" }
 }
 
 #[test]
+fn doctor_reports_explicit_requirements() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = "echo ok"
+test = "echo ok"
+run = "echo ok"
+fmt = "echo ok"
+clean = "echo ok"
+ci = "echo ok"
+lint = "echo ok"
+
+[requirements]
+tools = ["definitely-not-on-path-12345"]
+files = ["required.txt"]
+env = ["REQUIRED_TOKEN"]
+"#,
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(contains(
+            "warning: required tool `definitely-not-on-path-12345` was not found on PATH",
+        ))
+        .stdout(contains(
+            "warning: required file `required.txt` was not found",
+        ))
+        .stdout(contains(
+            "warning: required env var `REQUIRED_TOKEN` was not set",
+        ))
+        .stdout(contains(
+            "suggestion: install `definitely-not-on-path-12345` or update `[requirements].tools`",
+        ))
+        .stdout(contains(
+            "suggestion: create `required.txt` or update `[requirements].files`",
+        ))
+        .stdout(contains(
+            "suggestion: set `REQUIRED_TOKEN` or update `[requirements].env`",
+        ));
+}
+
+#[test]
 fn doctor_fix_creates_missing_env_files() {
     let temp = TempDir::new().expect("temp dir");
     write_config(

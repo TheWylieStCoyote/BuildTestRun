@@ -15,6 +15,8 @@ pub struct ProjectFile {
     #[serde(default)]
     pub env_file: Option<String>,
     #[serde(default)]
+    pub requirements: RequirementsSection,
+    #[serde(default)]
     pub profiles: HashMap<String, ProfileSection>,
     #[serde(default)]
     pub commands: CommandsSection,
@@ -33,7 +35,19 @@ pub struct ProfileSection {
     #[serde(default)]
     pub env_file: Option<String>,
     #[serde(default)]
+    pub requirements: RequirementsSection,
+    #[serde(default)]
     pub commands: CommandsSection,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct RequirementsSection {
+    #[serde(default)]
+    pub tools: Vec<String>,
+    #[serde(default)]
+    pub files: Vec<String>,
+    #[serde(default)]
+    pub env: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -431,6 +445,7 @@ pub struct ProjectConfig {
     pub env_file: Option<String>,
     pub selected_profile: Option<String>,
     pub profile_env_file: Option<String>,
+    pub requirements: RequirementsSection,
     pub commands: CommandsSection,
 }
 
@@ -457,6 +472,7 @@ impl ProjectConfig {
         let mut commands = CommandsSection::default();
         let mut profiles: HashMap<String, ProfileSection> = HashMap::new();
         let mut env_file: Option<String> = None;
+        let mut requirements = RequirementsSection::default();
         let profile_name = selected_profile_name(selected_profile);
         let selected_profile_name = profile_name.clone();
 
@@ -482,11 +498,18 @@ impl ProjectConfig {
             if file.env_file.is_some() {
                 env_file = file.env_file;
             }
+            merge_requirements(&mut requirements, file.requirements);
             merge_profiles(&mut profiles, file.profiles);
             commands.merge_from(file.commands);
         }
 
-        apply_selected_profile(&mut env, &mut commands, &profiles, selected_profile)?;
+        apply_selected_profile(
+            &mut env,
+            &mut commands,
+            &mut requirements,
+            &profiles,
+            selected_profile,
+        )?;
 
         commands = commands.resolve_inheritance()?;
 
@@ -519,6 +542,7 @@ impl ProjectConfig {
                 .as_deref()
                 .and_then(|name| profiles.get(name))
                 .and_then(|profile| profile.env_file.clone()),
+            requirements,
             commands,
         })
     }
@@ -542,6 +566,7 @@ impl ProjectConfig {
 
         let mut env = file.env;
         load_env_file(&root, file.env_file.as_deref(), &mut env)?;
+        let mut requirements = file.requirements;
 
         if file.commands.is_empty() {
             return Err(Error::MissingCommandGroup);
@@ -549,7 +574,13 @@ impl ProjectConfig {
         let mut commands = file.commands;
         let profile_name = selected_profile_name(None);
         let selected_profile_name = profile_name.clone();
-        apply_selected_profile(&mut env, &mut commands, &file.profiles, None)?;
+        apply_selected_profile(
+            &mut env,
+            &mut commands,
+            &mut requirements,
+            &file.profiles,
+            None,
+        )?;
         if let Some(profile_name) = profile_name.as_deref()
             && let Some(profile) = file.profiles.get(profile_name)
         {
@@ -566,6 +597,7 @@ impl ProjectConfig {
                 .as_deref()
                 .and_then(|name| file.profiles.get(name))
                 .and_then(|profile| profile.env_file.clone()),
+            requirements,
             commands: commands.resolve_inheritance()?,
         })
     }
@@ -653,6 +685,7 @@ fn merge_profiles(
             .entry(name)
             .and_modify(|existing| {
                 existing.env.extend(profile.env.clone());
+                merge_requirements(&mut existing.requirements, profile.requirements.clone());
                 existing.commands.merge_from(profile.commands.clone());
             })
             .or_insert(profile);
@@ -662,6 +695,7 @@ fn merge_profiles(
 fn apply_selected_profile(
     env: &mut HashMap<String, String>,
     commands: &mut CommandsSection,
+    requirements: &mut RequirementsSection,
     profiles: &HashMap<String, ProfileSection>,
     selected_profile: Option<&str>,
 ) -> Result<(), Error> {
@@ -683,8 +717,23 @@ fn apply_selected_profile(
     };
 
     env.extend(profile.env.clone());
+    merge_requirements(requirements, profile.requirements.clone());
     commands.merge_from(profile.commands.clone());
     Ok(())
+}
+
+fn merge_requirements(target: &mut RequirementsSection, source: RequirementsSection) {
+    merge_unique(&mut target.tools, source.tools);
+    merge_unique(&mut target.files, source.files);
+    merge_unique(&mut target.env, source.env);
+}
+
+fn merge_unique(target: &mut Vec<String>, source: Vec<String>) {
+    for item in source {
+        if !target.iter().any(|existing| existing == &item) {
+            target.push(item);
+        }
+    }
 }
 
 impl CommandsSection {

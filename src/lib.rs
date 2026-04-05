@@ -2527,6 +2527,7 @@ fn conventional_command_issues(config: &config::ProjectConfig) -> Vec<String> {
 
 fn validation_issues(config: &config::ProjectConfig) -> Vec<String> {
     let mut warnings = conventional_command_issues(config);
+    warnings.extend(requirements_issues(config));
 
     if let Some(env_file) = config.env_file.as_deref()
         && !env_file_exists(&config.root, env_file)
@@ -2569,6 +2570,30 @@ fn validation_issues(config: &config::ProjectConfig) -> Vec<String> {
     warnings
 }
 
+fn requirements_issues(config: &config::ProjectConfig) -> Vec<String> {
+    let mut warnings = Vec::new();
+
+    for tool in &config.requirements.tools {
+        if !program_on_path(tool) {
+            warnings.push(format!("required tool `{tool}` was not found on PATH"));
+        }
+    }
+
+    for file in &config.requirements.files {
+        if !requirement_file_exists(&config.root, file) {
+            warnings.push(format!("required file `{file}` was not found"));
+        }
+    }
+
+    for env_name in &config.requirements.env {
+        if !requirement_env_exists(&config.env, env_name) {
+            warnings.push(format!("required env var `{env_name}` was not set"));
+        }
+    }
+
+    warnings
+}
+
 fn doctor_suggestions(config: &config::ProjectConfig, warnings: &[String]) -> Vec<String> {
     let mut suggestions = Vec::new();
 
@@ -2601,6 +2626,30 @@ fn doctor_suggestions(config: &config::ProjectConfig, warnings: &[String]) -> Ve
             suggestions.push(format!(
                 "create the profile env file `{env_file}` or remove the profile-specific `env_file`"
             ));
+        }
+
+        if let Some(tool) = warning
+            .strip_prefix("required tool `")
+            .and_then(|rest| rest.split_once('`'))
+            .map(|(tool, _)| tool)
+        {
+            suggestions.push(format!("install `{tool}` or update `[requirements].tools`"));
+        }
+
+        if let Some(file) = warning
+            .strip_prefix("required file `")
+            .and_then(|rest| rest.split_once('`'))
+            .map(|(file, _)| file)
+        {
+            suggestions.push(format!("create `{file}` or update `[requirements].files`"));
+        }
+
+        if let Some(env_name) = warning
+            .strip_prefix("required env var `")
+            .and_then(|rest| rest.split_once('`'))
+            .map(|(env_name, _)| env_name)
+        {
+            suggestions.push(format!("set `{env_name}` or update `[requirements].env`"));
         }
     }
 
@@ -2649,6 +2698,14 @@ fn apply_doctor_fixes(config: &config::ProjectConfig) -> Result<Vec<String>, Err
 
 fn env_file_exists(root: &Path, env_file: &str) -> bool {
     root.join(env_file).is_file()
+}
+
+fn requirement_file_exists(root: &Path, path: &str) -> bool {
+    root.join(path).is_file()
+}
+
+fn requirement_env_exists(env: &std::collections::HashMap<String, String>, name: &str) -> bool {
+    env.contains_key(name) || std::env::var_os(name).is_some()
 }
 
 fn placeholder_run_warning(name: &str, command: &config::CommandSpec) -> Option<String> {

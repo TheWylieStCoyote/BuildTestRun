@@ -13,7 +13,7 @@ Add `mbr watch build`, `mbr watch test`, and `mbr watch workspace ...` for tight
 
 ## Strong Follow-Ups
 
-4. Explicit requirements in config
+4. [x] Explicit requirements in config
 Let projects declare required tools, files, and env vars so `doctor` can validate them directly.
 
 5. Trust model improvements

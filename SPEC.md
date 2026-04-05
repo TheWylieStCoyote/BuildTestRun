@@ -83,6 +83,7 @@ Commands may define `retries` to retry failed runs.
 `mbr workspace --fail-fast` should stop scheduling new workspace jobs after the first failure.
 `mbr workspace --keep-going` should continue scheduling remaining workspace jobs after failures.
 `mbr workspace --order name` should order workspace execution by project name instead of discovery path.
+`[requirements]` should support `tools`, `files`, and `env` lists that `doctor` validates directly, and profile requirements should merge into the selected config.
 `mbr watch <command>` should rerun the selected command when files change.
 `mbr watch workspace ...` should rerun workspace commands on file changes.
 `mbr watch --once` should run a single cycle and exit, which is useful for tests and scripting.
