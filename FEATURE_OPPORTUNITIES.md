@@ -19,7 +19,7 @@ Let projects declare required tools, files, and env vars so `doctor` can validat
 5. [x] Trust model improvements
 Add an explicit trust workflow for shell-based commands and untrusted repositories.
 
-6. JSON event streams
+6. [x] JSON event streams
 Keep stable final JSON envelopes, but add optional streaming events for long-running workspace and parallel runs.
 
 ## Nice To Have

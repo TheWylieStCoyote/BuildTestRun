@@ -1542,6 +1542,34 @@ fn parallel_json_has_stable_envelope() {
 }
 
 #[test]
+fn parallel_json_events_stream_to_stderr() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        &format!(
+            "[commands]\none = {}\ntwo = {}\n",
+            print_command_spec("one"),
+            print_command_spec("two")
+        ),
+    );
+
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["--json", "--json-events", "parallel", "one", "two"])
+        .assert()
+        .success()
+        .get_output()
+        .clone();
+
+    let stdout: Value = serde_json::from_slice(&output.stdout).expect("stdout json");
+    assert_eq!(stdout["status"], "ok");
+    let stderr = String::from_utf8(output.stderr).expect("stderr utf8");
+    assert!(stderr.contains("parallel_command_start"));
+    assert!(stderr.contains("parallel_command_finish"));
+}
+
+#[test]
 fn parallel_reports_failed_command_summary() {
     let temp = TempDir::new().expect("temp dir");
     write_config(
@@ -2240,6 +2268,71 @@ fn workspace_json_has_stable_envelope() {
     assert_eq!(value["status"], "ok");
     assert_eq!(value["command"], "workspace");
     assert!(value["projects"].is_null() || value["projects"].as_array().is_some());
+}
+
+#[test]
+fn workspace_json_events_stream_to_stderr() {
+    let temp = TempDir::new().expect("temp dir");
+    let first = mkdir(temp.path(), "first");
+    let second = mkdir(temp.path(), "second");
+    write_config(
+        &first,
+        &format!(
+            "[project]\nname = \"first\"\n[commands]\nbuild = {}\n",
+            print_command_spec("first-ok")
+        ),
+    );
+    write_config(
+        &second,
+        &format!(
+            "[project]\nname = \"second\"\n[commands]\nbuild = {}\n",
+            print_command_spec("second-ok")
+        ),
+    );
+
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["--json", "--json-events", "workspace", "build"])
+        .assert()
+        .success()
+        .get_output()
+        .clone();
+
+    let stdout: Value = serde_json::from_slice(&output.stdout).expect("stdout json");
+    assert_eq!(stdout["status"], "ok");
+    let stderr = String::from_utf8(output.stderr).expect("stderr utf8");
+    assert!(stderr.contains("workspace_command_start"));
+    assert!(stderr.contains("workspace_command_finish"));
+}
+
+#[test]
+fn release_json_events_stream_to_stderr() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        &format!(
+            "[commands]\nbuild = {}\ntest = {}\n",
+            print_command_spec("build-ok"),
+            print_command_spec("test-ok")
+        ),
+    );
+
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["--json", "--json-events", "release"])
+        .assert()
+        .success()
+        .get_output()
+        .clone();
+
+    let stdout: Value = serde_json::from_slice(&output.stdout).expect("stdout json");
+    assert_eq!(stdout["status"], "ok");
+    let stderr = String::from_utf8(output.stderr).expect("stderr utf8");
+    assert!(stderr.contains("release_stage_start"));
+    assert!(stderr.contains("release_stage_finish"));
+    assert!(stderr.contains("release_package_finish"));
 }
 
 #[test]

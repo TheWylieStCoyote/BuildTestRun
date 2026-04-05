@@ -74,6 +74,7 @@ pub fn run_from_args() -> Result<i32, Error> {
             },
             args.args,
             cli.json,
+            cli.json_events,
             cli.safe,
             cli.profile.as_deref(),
         ),
@@ -81,9 +82,13 @@ pub fn run_from_args() -> Result<i32, Error> {
             watch_action(&start_dir, args, cli.json, cli.safe, cli.profile.as_deref())
         }
         Action::Package(args) => package_action(&start_dir, args.output, cli.json),
-        Action::Release(args) => {
-            release_action(&start_dir, args.output, cli.json, cli.profile.as_deref())
-        }
+        Action::Release(args) => release_action(
+            &start_dir,
+            args.output,
+            cli.json,
+            cli.json_events,
+            cli.profile.as_deref(),
+        ),
         Action::Completions(args) => completions_action(args.shell),
         Action::Manpage => manpage_action(),
         Action::List(args) => {
@@ -117,6 +122,7 @@ pub fn run_from_args() -> Result<i32, Error> {
             &start_dir,
             args.names,
             cli.json,
+            cli.json_events,
             cli.dry_run,
             cli.safe,
             cli.profile.as_deref(),
@@ -158,12 +164,14 @@ pub fn run_action(
     Ok(status.code().unwrap_or(1))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn workspace_action(
     start_dir: &Path,
     list: bool,
     selection: WorkspaceSelection,
     args: Vec<String>,
     json_output: bool,
+    json_events: bool,
     safe: bool,
     profile: Option<&str>,
 ) -> Result<i32, Error> {
@@ -242,6 +250,7 @@ pub(crate) fn workspace_action(
                 args: &args,
                 safe,
                 json_output,
+                json_events,
                 jobs,
                 keep_going: selection.keep_going || !selection.fail_fast,
                 fail_fast: selection.fail_fast,
@@ -271,6 +280,15 @@ pub(crate) fn workspace_action(
     for (_, config) in projects {
         executed += 1;
         let started = Instant::now();
+        emit_json_event(
+            json_events,
+            "workspace_command_start",
+            vec![
+                ("command", json!(command_name)),
+                ("project", json!(config.name.clone())),
+                ("root", json!(config.root.clone())),
+            ],
+        );
         if !json_output {
             let prefix = config
                 .name
@@ -290,6 +308,17 @@ pub(crate) fn workspace_action(
             json_output,
         ) {
             Ok(status) => {
+                emit_json_event(
+                    json_events,
+                    "workspace_command_finish",
+                    vec![
+                        ("command", json!(command_name)),
+                        ("project", json!(config.name.clone())),
+                        ("root", json!(config.root.clone())),
+                        ("success", json!(status.success())),
+                        ("exit_code", json!(status.code())),
+                    ],
+                );
                 if !status.success() {
                     print_failure_summary(
                         config.name.as_deref(),
@@ -341,6 +370,7 @@ struct WorkspaceRunOptions<'a> {
     args: &'a [String],
     safe: bool,
     json_output: bool,
+    json_events: bool,
     jobs: usize,
     keep_going: bool,
     fail_fast: bool,
@@ -375,6 +405,7 @@ fn execute_workspace_projects(
         args,
         safe,
         json_output,
+        json_events,
         jobs,
         keep_going,
         fail_fast,
@@ -404,6 +435,15 @@ fn execute_workspace_projects(
         for (_, config) in projects.iter() {
             executed += 1;
             let started = Instant::now();
+            emit_json_event(
+                json_events,
+                "workspace_command_start",
+                vec![
+                    ("command", json!(command_name)),
+                    ("project", json!(config.name.clone())),
+                    ("root", json!(config.root.clone())),
+                ],
+            );
             if !json_output {
                 let prefix = config
                     .name
@@ -422,6 +462,17 @@ fn execute_workspace_projects(
                 config.name.as_deref(),
                 json_output,
             )?;
+            emit_json_event(
+                json_events,
+                "workspace_command_finish",
+                vec![
+                    ("command", json!(command_name)),
+                    ("project", json!(config.name.clone())),
+                    ("root", json!(config.root.clone())),
+                    ("success", json!(status.success())),
+                    ("exit_code", json!(status.code())),
+                ],
+            );
             if !status.success() {
                 print_failure_summary(
                     config.name.as_deref(),
@@ -465,6 +516,15 @@ fn execute_workspace_projects(
 
                     executed_count.fetch_add(1, Ordering::SeqCst);
                     let started = Instant::now();
+                    emit_json_event(
+                        json_events,
+                        "workspace_command_start",
+                        vec![
+                            ("command", json!(command_name.clone())),
+                            ("project", json!(config.name.clone())),
+                            ("root", json!(config.root.clone())),
+                        ],
+                    );
                     if !json_output {
                         let prefix = config
                             .name
@@ -485,6 +545,17 @@ fn execute_workspace_projects(
                         json_output,
                     ) {
                         Ok(status) => {
+                            emit_json_event(
+                                json_events,
+                                "workspace_command_finish",
+                                vec![
+                                    ("command", json!(command_name.clone())),
+                                    ("project", json!(config.name.clone())),
+                                    ("root", json!(config.root.clone())),
+                                    ("success", json!(status.success())),
+                                    ("exit_code", json!(status.code())),
+                                ],
+                            );
                             if !status.success() {
                                 print_failure_summary(
                                     config.name.as_deref(),
@@ -628,6 +699,7 @@ pub(crate) fn watch_action(
                 },
                 workspace_args.args.clone(),
                 json_output,
+                false,
                 safe,
                 profile,
             )?,
@@ -1941,6 +2013,7 @@ pub fn release_action(
     start_dir: &Path,
     output: Option<PathBuf>,
     json_output: bool,
+    json_events: bool,
     profile: Option<&str>,
 ) -> Result<i32, Error> {
     let (_, config) = load_project(start_dir, profile)?;
@@ -1952,7 +2025,25 @@ pub fn release_action(
     ] {
         let started = Instant::now();
         let action_label = action.to_string();
+        emit_json_event(
+            json_events,
+            "release_stage_start",
+            vec![
+                ("stage", json!(action_label.clone())),
+                ("root", json!(config.root.clone())),
+            ],
+        );
         let status = runner::execute(action, &config, false, None, json_output)?;
+        emit_json_event(
+            json_events,
+            "release_stage_finish",
+            vec![
+                ("stage", json!(action_label.clone())),
+                ("root", json!(config.root.clone())),
+                ("success", json!(status.success())),
+                ("exit_code", json!(status.code())),
+            ],
+        );
         if !status.success() {
             print_failure_summary(
                 config.name.as_deref(),
@@ -1965,6 +2056,14 @@ pub fn release_action(
     }
 
     let archive_path = create_package(&config, output)?;
+    emit_json_event(
+        json_events,
+        "release_package_finish",
+        vec![
+            ("root", json!(config.root.clone())),
+            ("output", json!(archive_path.clone())),
+        ],
+    );
     if json_output {
         print_stable_json(json_envelope(
             "release",
@@ -2332,6 +2431,7 @@ pub fn parallel_action(
     start_dir: &Path,
     names: Vec<String>,
     json_output: bool,
+    json_events: bool,
     dry_run: bool,
     safe: bool,
     profile: Option<&str>,
@@ -2385,6 +2485,14 @@ pub fn parallel_action(
         let label = name.clone();
         handles.push(thread::spawn(move || {
             let started = Instant::now();
+            emit_json_event(
+                json_events,
+                "parallel_command_start",
+                vec![
+                    ("command", json!(label.clone())),
+                    ("project", json!(config.name.clone())),
+                ],
+            );
             runner::execute(
                 Action::Exec(cli::ExecArgs {
                     name,
@@ -2395,7 +2503,19 @@ pub fn parallel_action(
                 Some(label.as_str()),
                 json_output,
             )
-            .map(|status| (label, status, started.elapsed()))
+            .map(|status| {
+                emit_json_event(
+                    json_events,
+                    "parallel_command_finish",
+                    vec![
+                        ("command", json!(label.clone())),
+                        ("project", json!(config.name.clone())),
+                        ("success", json!(status.success())),
+                        ("exit_code", json!(status.code())),
+                    ],
+                );
+                (label, status, started.elapsed())
+            })
         }));
     }
 
@@ -2937,7 +3057,24 @@ fn trust_warning(config: &config::ProjectConfig) {
 }
 
 fn print_stable_json(value: Value) {
-    println!("{}", stable_value(value));
+    print_stable_json_to(&mut std::io::stdout(), value);
+}
+
+fn print_stable_json_to<W: Write>(writer: &mut W, value: Value) {
+    let _ = writeln!(writer, "{}", stable_value(value));
+}
+
+fn emit_json_event(enabled: bool, event: &str, fields: Vec<(&str, Value)>) {
+    if !enabled {
+        return;
+    }
+
+    let mut all_fields = vec![("event", json!(event))];
+    all_fields.extend(fields);
+    print_stable_json_to(
+        &mut std::io::stderr(),
+        json_envelope("event", "ok", all_fields),
+    );
 }
 
 fn stable_value(value: Value) -> Value {

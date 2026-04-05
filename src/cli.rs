@@ -285,6 +285,9 @@ pub struct Cli {
     #[arg(long)]
     pub json: bool,
 
+    #[arg(long = "json-events")]
+    pub json_events: bool,
+
     #[arg(long, value_name = "NAME")]
     pub profile: Option<String>,
 
