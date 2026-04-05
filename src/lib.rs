@@ -56,7 +56,8 @@ pub fn run_from_args() -> Result<i32, Error> {
             WorkspaceSelection {
                 command_name: args.command,
                 filter_name: args.name,
-                changed_only: args.changed_only,
+                changed_only: args.changed_only || args.since.is_some(),
+                since: args.since,
             },
             args.args,
             cli.json,
@@ -147,7 +148,7 @@ pub(crate) fn workspace_action(
     let projects =
         collect_workspace_projects(&projects, profile, selection.filter_name.as_deref())?;
     let projects = if selection.changed_only {
-        filter_changed_workspace_projects(start_dir, projects)?
+        filter_changed_workspace_projects(start_dir, projects, selection.since.as_deref())?
     } else {
         projects
     };
@@ -237,6 +238,7 @@ struct WorkspaceSelection {
     command_name: Option<String>,
     filter_name: Option<String>,
     changed_only: bool,
+    since: Option<String>,
 }
 
 fn collect_workspace_projects(
@@ -265,8 +267,9 @@ fn collect_workspace_projects(
 fn filter_changed_workspace_projects(
     start_dir: &Path,
     projects: Vec<(PathBuf, config::ProjectConfig)>,
+    since: Option<&str>,
 ) -> Result<Vec<(PathBuf, config::ProjectConfig)>, Error> {
-    let changed_paths = git_changed_paths(start_dir)?;
+    let changed_paths = git_changed_paths(start_dir, since)?;
     Ok(projects
         .into_iter()
         .filter(|(path, config)| {
@@ -286,32 +289,58 @@ fn filter_changed_workspace_projects(
         .collect())
 }
 
-fn git_changed_paths(start_dir: &Path) -> Result<Vec<PathBuf>, Error> {
+fn git_changed_paths(start_dir: &Path, since: Option<&str>) -> Result<Vec<PathBuf>, Error> {
     let repo_root = git_repo_root(start_dir)?;
     let mut changed = Vec::new();
 
-    let output = std::process::Command::new("git")
-        .current_dir(start_dir)
-        .args(["status", "--porcelain=1", "--untracked-files=all"])
-        .output()
-        .map_err(|source| Error::Execution(source.to_string()))?;
+    if let Some(since) = since {
+        for args in [
+            vec!["diff", "--name-only", since],
+            vec!["diff", "--name-only", "--cached", since],
+            vec!["ls-files", "--others", "--exclude-standard"],
+        ] {
+            let output = std::process::Command::new("git")
+                .current_dir(start_dir)
+                .args(args)
+                .output()
+                .map_err(|source| Error::Execution(source.to_string()))?;
 
-    if !output.status.success() {
-        return Err(Error::Execution("failed to query git changes".to_string()));
-    }
+            if !output.status.success() {
+                return Err(Error::Execution("failed to query git changes".to_string()));
+            }
 
-    for line in String::from_utf8_lossy(&output.stdout).lines() {
-        if line.len() < 4 {
-            continue;
+            for line in String::from_utf8_lossy(&output.stdout).lines() {
+                let path = line.trim();
+                if path.is_empty() {
+                    continue;
+                }
+                changed.push(repo_root.join(path));
+            }
+        }
+    } else {
+        let output = std::process::Command::new("git")
+            .current_dir(start_dir)
+            .args(["status", "--porcelain=1", "--untracked-files=all"])
+            .output()
+            .map_err(|source| Error::Execution(source.to_string()))?;
+
+        if !output.status.success() {
+            return Err(Error::Execution("failed to query git changes".to_string()));
         }
 
-        let path = line[3..].trim();
-        if path.is_empty() {
-            continue;
-        }
+        for line in String::from_utf8_lossy(&output.stdout).lines() {
+            if line.len() < 4 {
+                continue;
+            }
 
-        let path = path.split(" -> ").last().unwrap_or(path);
-        changed.push(repo_root.join(path));
+            let path = line[3..].trim();
+            if path.is_empty() {
+                continue;
+            }
+
+            let path = path.split(" -> ").last().unwrap_or(path);
+            changed.push(repo_root.join(path));
+        }
     }
 
     changed.sort();

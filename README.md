@@ -118,6 +118,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Supports `workspace` to discover and run commands across projects
 - Supports `workspace --name <project>` to filter discovered projects by project name
 - Supports `workspace --changed-only` to limit execution to changed projects
+- Supports `workspace --changed-only --since <ref>` to choose the git base
 - Supports `package` to create local release archives
 - Supports `release` to run build/test and then package
 - Supports `completions` and `manpage` generation

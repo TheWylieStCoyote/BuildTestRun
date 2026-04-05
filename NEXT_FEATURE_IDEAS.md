@@ -2,7 +2,7 @@
 
 ## High-Value Additions
 
-1. `mbr workspace --changed-only --since <ref>`
+1. [x] `mbr workspace --changed-only --since <ref>`
 Let users choose the git base instead of only the default diff.
 
 2. Command summaries

@@ -1599,6 +1599,15 @@ fn workspace_filters_projects_by_changed_files() {
         .success()
         .stdout(contains("[second] second-changed"))
         .stdout(predicates::str::contains("first-ok").not());
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["workspace", "--changed-only", "--since", "HEAD", "build"])
+        .assert()
+        .success()
+        .stdout(contains("[second] second-changed"))
+        .stdout(predicates::str::contains("first-ok").not());
 }
 
 #[test]
