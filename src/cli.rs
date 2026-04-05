@@ -119,6 +119,9 @@ pub struct InitArgs {
     #[arg(long)]
     pub force: bool,
 
+    #[arg(long = "import")]
+    pub r#import: bool,
+
     #[arg(long, value_enum, default_value_t = InitTemplate::Rust)]
     pub template: InitTemplate,
 

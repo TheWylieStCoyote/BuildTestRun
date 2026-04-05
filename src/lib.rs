@@ -10,6 +10,7 @@ pub use error::Error;
 use clap::{CommandFactory, Parser};
 use serde_json::{Map, Value, json};
 use std::{
+    collections::HashSet,
     env, fs,
     io::{Seek, Write},
     path::{Path, PathBuf},
@@ -41,6 +42,7 @@ pub fn run_from_args() -> Result<i32, Error> {
             args.force,
             args.template,
             InitOptions {
+                r#import: args.r#import,
                 interactive: args.interactive,
                 detect: args.detect,
                 print: args.print,
@@ -461,6 +463,12 @@ pub(crate) fn init_action(
         return templates_action(json_output, false);
     }
 
+    if options.r#import && options.template_file.is_some() {
+        return Err(Error::Execution(
+            "--import cannot be combined with --template-file".to_string(),
+        ));
+    }
+
     let template = if options.detect {
         detect_init_template(start_dir).unwrap_or(template)
     } else {
@@ -473,18 +481,23 @@ pub(crate) fn init_action(
     }
 
     let init_spec = if options.interactive {
-        prompt_init_spec(template)?
+        Some(prompt_init_spec(template)?)
     } else {
-        InitSpec {
-            project_name: "example".to_string(),
-            project_root: ".".to_string(),
-            template,
-            safe_mode: false,
-            optional_commands: Vec::new(),
-        }
+        None
     };
 
-    let rendered = render_init_template(&init_spec, options.template_file)?;
+    let rendered = if options.r#import {
+        match import_init_template(start_dir)? {
+            Some(rendered) => rendered,
+            None => {
+                let init_spec = init_spec.unwrap_or_else(|| default_init_spec(template));
+                render_init_template(&init_spec, None)?
+            }
+        }
+    } else {
+        let init_spec = init_spec.unwrap_or_else(|| default_init_spec(template));
+        render_init_template(&init_spec, options.template_file)?
+    };
 
     if options.print {
         if json_output {
@@ -511,8 +524,10 @@ pub(crate) fn init_action(
         print_stable_json(json_envelope("init", "ok", vec![("path", json!(path))]));
     } else {
         eprintln!("[mbr] wrote {}", path.display());
-        for warning in template_warnings(init_spec.template) {
-            eprintln!("warning: {warning}");
+        if !options.r#import {
+            for warning in template_warnings(template) {
+                eprintln!("warning: {warning}");
+            }
         }
     }
 
@@ -527,7 +542,18 @@ struct InitSpec {
     optional_commands: Vec<String>,
 }
 
+fn default_init_spec(template: cli::InitTemplate) -> InitSpec {
+    InitSpec {
+        project_name: "example".to_string(),
+        project_root: ".".to_string(),
+        template,
+        safe_mode: false,
+        optional_commands: Vec::new(),
+    }
+}
+
 struct InitOptions {
+    r#import: bool,
     interactive: bool,
     detect: bool,
     print: bool,
@@ -640,6 +666,433 @@ fn detect_template_in_dir(dir: &Path) -> Option<cli::InitTemplate> {
     }
 
     None
+}
+
+fn import_init_template(start_dir: &Path) -> Result<Option<String>, Error> {
+    if let Some(rendered) = import_from_cargo(start_dir)? {
+        return Ok(Some(rendered));
+    }
+    if let Some(rendered) = import_from_package_json(start_dir)? {
+        return Ok(Some(rendered));
+    }
+    if let Some(rendered) = import_from_pyproject(start_dir)? {
+        return Ok(Some(rendered));
+    }
+    if let Some(rendered) = import_from_makefile(start_dir)? {
+        return Ok(Some(rendered));
+    }
+    if let Some(rendered) = import_from_justfile(start_dir)? {
+        return Ok(Some(rendered));
+    }
+
+    Ok(None)
+}
+
+fn import_from_cargo(start_dir: &Path) -> Result<Option<String>, Error> {
+    let path = start_dir.join("Cargo.toml");
+    if !path.is_file() {
+        return Ok(None);
+    }
+
+    let contents =
+        fs::read_to_string(&path).map_err(|source| Error::Execution(source.to_string()))?;
+    let parsed: toml::Value = toml::from_str(&contents)
+        .map_err(|source| Error::Execution(format!("failed to parse Cargo.toml: {source}")))?;
+    let project_name = parsed
+        .get("package")
+        .and_then(|package| package.get("name"))
+        .and_then(toml::Value::as_str)
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| default_project_name(start_dir));
+    let template = if parsed.get("workspace").is_some() {
+        cli::InitTemplate::CargoWorkspace
+    } else {
+        cli::InitTemplate::Rust
+    };
+
+    render_init_template(
+        &InitSpec {
+            project_name,
+            project_root: ".".to_string(),
+            template,
+            safe_mode: false,
+            optional_commands: Vec::new(),
+        },
+        None,
+    )
+    .map(Some)
+}
+
+fn import_from_package_json(start_dir: &Path) -> Result<Option<String>, Error> {
+    let path = start_dir.join("package.json");
+    if !path.is_file() {
+        return Ok(None);
+    }
+
+    let contents =
+        fs::read_to_string(&path).map_err(|source| Error::Execution(source.to_string()))?;
+    let parsed: serde_json::Value = serde_json::from_str(&contents)
+        .map_err(|source| Error::Execution(format!("failed to parse package.json: {source}")))?;
+    let project_name = parsed
+        .get("name")
+        .and_then(serde_json::Value::as_str)
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| default_project_name(start_dir));
+    let template = package_manager_template(start_dir, &parsed);
+    let scripts = parsed
+        .get("scripts")
+        .and_then(serde_json::Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+
+    if scripts.is_empty() {
+        return render_init_template(
+            &InitSpec {
+                project_name,
+                project_root: ".".to_string(),
+                template,
+                safe_mode: false,
+                optional_commands: Vec::new(),
+            },
+            None,
+        )
+        .map(Some);
+    }
+
+    let manager = package_manager_name(start_dir, &parsed);
+    let mut commands = Vec::new();
+    let mut script_names = Vec::new();
+    for (name, script) in scripts {
+        if script.as_str().is_some() {
+            let script_name = name.clone();
+            script_names.push(script_name.clone());
+            commands.push(ImportedCommand {
+                name: script_name.clone(),
+                program: manager.clone(),
+                args: vec!["run".to_string(), script_name.clone()],
+                description: Some(format!("Run `{script_name}` script")),
+            });
+        }
+    }
+
+    if script_names.iter().any(|name| name == "start")
+        && !script_names.iter().any(|name| name == "run")
+    {
+        commands.push(ImportedCommand {
+            name: "run".to_string(),
+            program: manager.clone(),
+            args: vec!["run".to_string(), "start".to_string()],
+            description: Some("Start the app".to_string()),
+        });
+    } else if script_names.iter().any(|name| name == "dev")
+        && !script_names.iter().any(|name| name == "run")
+    {
+        commands.push(ImportedCommand {
+            name: "run".to_string(),
+            program: manager.clone(),
+            args: vec!["run".to_string(), "dev".to_string()],
+            description: Some("Start the dev server".to_string()),
+        });
+    }
+
+    Ok(Some(render_imported_config(project_name, commands)))
+}
+
+fn import_from_pyproject(start_dir: &Path) -> Result<Option<String>, Error> {
+    let path = start_dir.join("pyproject.toml");
+    if !path.is_file() {
+        return Ok(None);
+    }
+
+    let contents =
+        fs::read_to_string(&path).map_err(|source| Error::Execution(source.to_string()))?;
+    let parsed: toml::Value = toml::from_str(&contents)
+        .map_err(|source| Error::Execution(format!("failed to parse pyproject.toml: {source}")))?;
+    let project_name = parsed
+        .get("project")
+        .and_then(|project| project.get("name"))
+        .and_then(toml::Value::as_str)
+        .or_else(|| {
+            parsed
+                .get("tool")
+                .and_then(|tool| tool.get("poetry"))
+                .and_then(|poetry| poetry.get("name"))
+                .and_then(toml::Value::as_str)
+        })
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| default_project_name(start_dir));
+    let template = if parsed
+        .get("tool")
+        .and_then(|tool| tool.get("poetry"))
+        .is_some()
+    {
+        cli::InitTemplate::Poetry
+    } else if parsed
+        .get("tool")
+        .and_then(|tool| tool.get("hatch"))
+        .is_some()
+    {
+        cli::InitTemplate::Hatch
+    } else if parsed
+        .get("tool")
+        .and_then(|tool| tool.get("pixi"))
+        .is_some()
+    {
+        cli::InitTemplate::Pixi
+    } else if parsed.get("tool").and_then(|tool| tool.get("uv")).is_some() {
+        cli::InitTemplate::Uv
+    } else {
+        cli::InitTemplate::Python
+    };
+
+    render_init_template(
+        &InitSpec {
+            project_name,
+            project_root: ".".to_string(),
+            template,
+            safe_mode: false,
+            optional_commands: Vec::new(),
+        },
+        None,
+    )
+    .map(Some)
+}
+
+fn import_from_makefile(start_dir: &Path) -> Result<Option<String>, Error> {
+    let path = find_project_file(start_dir, &["Makefile", "makefile", "GNUmakefile"]);
+    let Some(path) = path else {
+        return Ok(None);
+    };
+
+    let contents =
+        fs::read_to_string(&path).map_err(|source| Error::Execution(source.to_string()))?;
+    let targets = parse_make_targets(&contents);
+    if targets.is_empty() {
+        return Ok(Some(render_imported_config(
+            default_project_name(start_dir),
+            vec![ImportedCommand {
+                name: "build".to_string(),
+                program: "make".to_string(),
+                args: vec!["build".to_string()],
+                description: Some("Run the build target".to_string()),
+            }],
+        )));
+    }
+
+    let commands = targets
+        .into_iter()
+        .map(|name| ImportedCommand {
+            program: "make".to_string(),
+            args: vec![name.clone()],
+            description: Some(format!("Run `make {name}`")),
+            name,
+        })
+        .collect();
+
+    Ok(Some(render_imported_config(
+        default_project_name(start_dir),
+        commands,
+    )))
+}
+
+fn import_from_justfile(start_dir: &Path) -> Result<Option<String>, Error> {
+    let path = find_project_file(start_dir, &["Justfile", "justfile"]);
+    let Some(path) = path else {
+        return Ok(None);
+    };
+
+    let contents =
+        fs::read_to_string(&path).map_err(|source| Error::Execution(source.to_string()))?;
+    let recipes = parse_just_recipes(&contents);
+    if recipes.is_empty() {
+        return Ok(Some(render_imported_config(
+            default_project_name(start_dir),
+            vec![ImportedCommand {
+                name: "build".to_string(),
+                program: "just".to_string(),
+                args: vec!["build".to_string()],
+                description: Some("Run the build recipe".to_string()),
+            }],
+        )));
+    }
+
+    let commands = recipes
+        .into_iter()
+        .map(|name| ImportedCommand {
+            program: "just".to_string(),
+            args: vec![name.clone()],
+            description: Some(format!("Run `{name}`")),
+            name,
+        })
+        .collect();
+
+    Ok(Some(render_imported_config(
+        default_project_name(start_dir),
+        commands,
+    )))
+}
+
+fn package_manager_template(start_dir: &Path, parsed: &serde_json::Value) -> cli::InitTemplate {
+    match package_manager_name(start_dir, parsed).as_str() {
+        "pnpm" => cli::InitTemplate::Pnpm,
+        "yarn" => cli::InitTemplate::Yarn,
+        "bun" => cli::InitTemplate::Bun,
+        _ => cli::InitTemplate::Node,
+    }
+}
+
+fn package_manager_name(start_dir: &Path, parsed: &serde_json::Value) -> String {
+    if let Some(manager) = parsed
+        .get("packageManager")
+        .and_then(serde_json::Value::as_str)
+    {
+        if manager.starts_with("pnpm") {
+            return "pnpm".to_string();
+        }
+        if manager.starts_with("yarn") {
+            return "yarn".to_string();
+        }
+        if manager.starts_with("bun") {
+            return "bun".to_string();
+        }
+    }
+
+    if start_dir.join("pnpm-lock.yaml").is_file() {
+        "pnpm".to_string()
+    } else if start_dir.join("yarn.lock").is_file() {
+        "yarn".to_string()
+    } else if start_dir.join("bun.lockb").is_file() || start_dir.join("bun.lock").is_file() {
+        "bun".to_string()
+    } else {
+        "npm".to_string()
+    }
+}
+
+fn parse_make_targets(contents: &str) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut targets = Vec::new();
+
+    for line in contents.lines() {
+        let line = line.trim_end();
+        if line.is_empty()
+            || line.starts_with('\t')
+            || line.starts_with(' ')
+            || line.starts_with('#')
+        {
+            continue;
+        }
+
+        let Some((name, rest)) = line.split_once(':') else {
+            continue;
+        };
+        let name = name.trim();
+        if name.is_empty()
+            || name.starts_with('.')
+            || name.contains('%')
+            || name.contains(' ')
+            || rest.trim_start().starts_with('=')
+        {
+            continue;
+        }
+
+        if seen.insert(name.to_string()) {
+            targets.push(name.to_string());
+        }
+    }
+
+    targets
+}
+
+fn parse_just_recipes(contents: &str) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut recipes = Vec::new();
+
+    for line in contents.lines() {
+        let line = line.trim_end();
+        if line.is_empty()
+            || line.starts_with('#')
+            || line.starts_with(' ')
+            || line.starts_with('\t')
+        {
+            continue;
+        }
+
+        let Some((name, rest)) = line.split_once(':') else {
+            continue;
+        };
+        let name = name.trim();
+        if name.is_empty()
+            || name.starts_with('[')
+            || name.starts_with("set ")
+            || name.starts_with("import ")
+            || name.contains(' ')
+            || rest.trim_start().starts_with('=')
+        {
+            continue;
+        }
+
+        if seen.insert(name.to_string()) {
+            recipes.push(name.to_string());
+        }
+    }
+
+    recipes
+}
+
+fn find_project_file(start_dir: &Path, candidates: &[&str]) -> Option<PathBuf> {
+    candidates
+        .iter()
+        .map(|candidate| start_dir.join(candidate))
+        .find(|path| path.is_file())
+}
+
+fn default_project_name(start_dir: &Path) -> String {
+    start_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name.to_string())
+        .unwrap_or_else(|| "example".to_string())
+}
+
+struct ImportedCommand {
+    name: String,
+    program: String,
+    args: Vec<String>,
+    description: Option<String>,
+}
+
+fn render_imported_config(project_name: String, commands: Vec<ImportedCommand>) -> String {
+    let mut output = String::new();
+    output.push_str(&format!(
+        "[project]\nname = {}\nroot = \".\"\n\n[commands]\n",
+        toml_string(&project_name)
+    ));
+
+    let mut commands = commands;
+    commands.sort_by(|left, right| left.name.cmp(&right.name));
+    for command in commands {
+        output.push_str(&format!(
+            "{} = {{ program = {}, args = [{}]",
+            toml_string(&command.name),
+            toml_string(&command.program),
+            command
+                .args
+                .iter()
+                .map(|arg| toml_string(arg))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+        if let Some(description) = command.description {
+            output.push_str(&format!(", description = {}", toml_string(&description)));
+        }
+        output.push_str(" }\n");
+    }
+
+    output
+}
+
+fn toml_string(value: &str) -> String {
+    format!("{:?}", value)
 }
 
 fn prompt_yes_no(label: &str, default: bool) -> Result<bool, Error> {

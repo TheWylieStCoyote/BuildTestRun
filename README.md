@@ -19,6 +19,7 @@ mbr --profile dev build
 mbr init --template node
 mbr init --interactive
 mbr init --detect
+mbr init --import
 mbr init --list-templates
 mbr init --template-file custom-template.toml
 mbr templates
@@ -80,6 +81,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Generates a starter config with `mbr init --template <name>`
 - Supports interactive prompts with `mbr init --interactive`
 - Detects common project types with `mbr init --detect`
+- Imports common project files with `mbr init --import`
 - `mbr init --detect --interactive` uses the detected template as the default prompt
 - Prints starter configs with `mbr init --print`
 - Interactive init can add template-specific optional commands and safe structured-only mode

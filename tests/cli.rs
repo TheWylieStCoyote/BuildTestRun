@@ -494,6 +494,83 @@ fn init_detects_template_from_project_markers() {
 }
 
 #[test]
+fn init_imports_package_json_scripts() {
+    let temp = TempDir::new().expect("temp dir");
+    fs::write(
+        temp.path().join("package.json"),
+        r#"{
+  "name": "web-app",
+  "scripts": {
+    "build": "vite build",
+    "start": "vite",
+    "lint": "eslint ."
+  }
+}
+"#,
+    )
+    .expect("write package.json");
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["init", "--import"])
+        .assert()
+        .success();
+
+    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    assert!(contents.contains("name = \"web-app\""));
+    assert!(contents.contains("\"build\" = { program = \"npm\", args = [\"run\", \"build\"]"));
+    assert!(contents.contains("\"run\" = { program = \"npm\", args = [\"run\", \"start\"]"));
+    assert!(contents.contains("\"lint\" = { program = \"npm\", args = [\"run\", \"lint\"]"));
+}
+
+#[test]
+fn init_imports_pyproject_poetry() {
+    let temp = TempDir::new().expect("temp dir");
+    fs::write(
+        temp.path().join("pyproject.toml"),
+        r#"[tool.poetry]
+name = "demo"
+version = "0.1.0"
+"#,
+    )
+    .expect("write pyproject");
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["init", "--import"])
+        .assert()
+        .success();
+
+    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    assert!(contents.contains("name = \"demo\""));
+    assert!(contents.contains("program = \"poetry\""));
+}
+
+#[test]
+fn init_imports_makefile_targets() {
+    let temp = TempDir::new().expect("temp dir");
+    fs::write(
+        temp.path().join("Makefile"),
+        "build:\n\tcargo build\n\ntest:\n\tcargo test\n",
+    )
+    .expect("write makefile");
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["init", "--import"])
+        .assert()
+        .success();
+
+    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    assert!(contents.contains("program = \"make\""));
+    assert!(contents.contains("\"build\" = { program = \"make\", args = [\"build\"]"));
+    assert!(contents.contains("\"test\" = { program = \"make\", args = [\"test\"]"));
+}
+
+#[test]
 fn init_detected_template_drives_interactive_prompts() {
     let temp = TempDir::new().expect("temp dir");
     fs::write(
