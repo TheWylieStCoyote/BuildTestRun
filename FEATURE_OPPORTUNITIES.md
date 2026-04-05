@@ -8,7 +8,7 @@ Generate `.mbr.toml` from existing project files like `Cargo.toml`, `package.jso
 2. [x] Workspace controls
 Add `workspace --jobs <n>`, `--fail-fast`, `--keep-going`, and ordered execution options.
 
-3. `watch` mode
+3. [x] `watch` mode
 Add `mbr watch build`, `mbr watch test`, and `mbr watch workspace ...` for tight feedback loops.
 
 ## Strong Follow-Ups

@@ -1,3 +1,5 @@
+#![allow(clippy::result_large_err)]
+
 mod cli;
 mod config;
 mod discovery;
@@ -20,7 +22,7 @@ use std::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     thread,
-    time::Instant,
+    time::{Duration, Instant, SystemTime},
 };
 
 fn json_envelope(command: &str, status: &str, fields: Vec<(&str, Value)>) -> Value {
@@ -75,6 +77,9 @@ pub fn run_from_args() -> Result<i32, Error> {
             cli.safe,
             cli.profile.as_deref(),
         ),
+        Action::Watch(args) => {
+            watch_action(&start_dir, args, cli.json, cli.safe, cli.profile.as_deref())
+        }
         Action::Package(args) => package_action(&start_dir, args.output, cli.json),
         Action::Release(args) => {
             release_action(&start_dir, args.output, cli.json, cli.profile.as_deref())
@@ -545,6 +550,158 @@ fn execute_workspace_projects(
     );
 
     Ok(exit_code)
+}
+
+pub(crate) fn watch_action(
+    start_dir: &Path,
+    args: cli::WatchArgs,
+    json_output: bool,
+    safe: bool,
+    profile: Option<&str>,
+) -> Result<i32, Error> {
+    let interval = Duration::from_millis(args.poll_interval.max(1));
+    let mut last_snapshot = snapshot_watch_tree(start_dir)?;
+
+    loop {
+        let exit_code = match &args.action {
+            cli::WatchAction::Build(command_args) => run_watch_command(
+                Action::Build(command_args.clone()),
+                start_dir,
+                json_output,
+                safe,
+                profile,
+            )?,
+            cli::WatchAction::Test(command_args) => run_watch_command(
+                Action::Test(command_args.clone()),
+                start_dir,
+                json_output,
+                safe,
+                profile,
+            )?,
+            cli::WatchAction::Run(command_args) => run_watch_command(
+                Action::Run(command_args.clone()),
+                start_dir,
+                json_output,
+                safe,
+                profile,
+            )?,
+            cli::WatchAction::Dev(command_args) => run_watch_command(
+                Action::Dev(command_args.clone()),
+                start_dir,
+                json_output,
+                safe,
+                profile,
+            )?,
+            cli::WatchAction::Fmt(command_args) => run_watch_command(
+                Action::Fmt(command_args.clone()),
+                start_dir,
+                json_output,
+                safe,
+                profile,
+            )?,
+            cli::WatchAction::Clean(command_args) => run_watch_command(
+                Action::Clean(command_args.clone()),
+                start_dir,
+                json_output,
+                safe,
+                profile,
+            )?,
+            cli::WatchAction::Ci(command_args) => run_watch_command(
+                Action::Ci(command_args.clone()),
+                start_dir,
+                json_output,
+                safe,
+                profile,
+            )?,
+            cli::WatchAction::Workspace(workspace_args) => workspace_action(
+                start_dir,
+                workspace_args.list,
+                WorkspaceSelection {
+                    command_name: workspace_args.command.clone(),
+                    filter_name: workspace_args.name.clone(),
+                    changed_only: workspace_args.changed_only || workspace_args.since.is_some(),
+                    since: workspace_args.since.clone(),
+                    jobs: workspace_args.jobs,
+                    fail_fast: workspace_args.fail_fast,
+                    keep_going: workspace_args.keep_going,
+                    order: workspace_args.order,
+                },
+                workspace_args.args.clone(),
+                json_output,
+                safe,
+                profile,
+            )?,
+        };
+
+        if args.once {
+            return Ok(exit_code);
+        }
+
+        let current_snapshot = snapshot_watch_tree(start_dir)?;
+        if current_snapshot != last_snapshot {
+            last_snapshot = current_snapshot;
+            continue;
+        }
+
+        thread::sleep(interval);
+    }
+}
+
+fn run_watch_command(
+    action: Action,
+    start_dir: &Path,
+    _json_output: bool,
+    safe: bool,
+    profile: Option<&str>,
+) -> Result<i32, Error> {
+    run_action(action, start_dir, safe, profile)
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct WatchEntry {
+    path: PathBuf,
+    modified: Option<SystemTime>,
+    len: u64,
+}
+
+fn snapshot_watch_tree(start_dir: &Path) -> Result<Vec<WatchEntry>, Error> {
+    let mut entries = Vec::new();
+    collect_watch_entries(start_dir, &mut entries)?;
+    entries.sort_by(|left, right| left.path.cmp(&right.path));
+    Ok(entries)
+}
+
+fn collect_watch_entries(dir: &Path, entries: &mut Vec<WatchEntry>) -> Result<(), Error> {
+    for entry in fs::read_dir(dir).map_err(|source| Error::Execution(source.to_string()))? {
+        let entry = entry.map_err(|source| Error::Execution(source.to_string()))?;
+        let path = entry.path();
+        let file_name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("");
+
+        if path.is_dir() {
+            if should_skip_watch_dir(file_name) {
+                continue;
+            }
+            collect_watch_entries(&path, entries)?;
+        } else if path.is_file() {
+            let metadata = entry
+                .metadata()
+                .map_err(|source| Error::Execution(source.to_string()))?;
+            entries.push(WatchEntry {
+                path,
+                modified: metadata.modified().ok(),
+                len: metadata.len(),
+            });
+        }
+    }
+
+    Ok(())
+}
+
+fn should_skip_watch_dir(name: &str) -> bool {
+    matches!(name, ".git" | "target" | "node_modules" | "dist" | "build")
 }
 
 fn collect_workspace_projects(
@@ -2652,6 +2809,7 @@ fn action_command(action: &Action) -> (String, Vec<String>) {
         | Action::Init(_)
         | Action::Templates(_)
         | Action::Workspace(_)
+        | Action::Watch(_)
         | Action::Package(_)
         | Action::Release(_)
         | Action::Completions(_)
@@ -2733,5 +2891,24 @@ fn unknown_command_error(name: &str) -> Error {
         other => Error::UnknownCommand {
             name: other.to_string(),
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn snapshot_watch_tree_changes_when_files_change() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        fs::write(temp.path().join("file.txt"), "one").expect("write file");
+
+        let first = snapshot_watch_tree(temp.path()).expect("first snapshot");
+        let second = snapshot_watch_tree(temp.path()).expect("second snapshot");
+        assert_eq!(first, second);
+
+        fs::write(temp.path().join("file.txt"), "two").expect("rewrite file");
+        let third = snapshot_watch_tree(temp.path()).expect("third snapshot");
+        assert_ne!(first, third);
     }
 }

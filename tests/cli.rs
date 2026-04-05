@@ -178,6 +178,23 @@ fn dev_runs_configured_command() {
 }
 
 #[test]
+fn watch_once_runs_the_selected_command() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        &format!("[commands]\nbuild = {}\n", print_command_spec("watch-ok")),
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["watch", "--once", "build"])
+        .assert()
+        .success()
+        .stdout(contains("watch-ok"));
+}
+
+#[test]
 fn build_forwards_extra_args() {
     let temp = TempDir::new().expect("temp dir");
     write_config(

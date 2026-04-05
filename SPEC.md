@@ -18,6 +18,7 @@ mbr doctor
 mbr show <name>
 mbr --workspace <path>
 mbr parallel <name>...
+mbr watch <command>
 mbr fmt
 mbr clean
 mbr ci
@@ -82,6 +83,9 @@ Commands may define `retries` to retry failed runs.
 `mbr workspace --fail-fast` should stop scheduling new workspace jobs after the first failure.
 `mbr workspace --keep-going` should continue scheduling remaining workspace jobs after failures.
 `mbr workspace --order name` should order workspace execution by project name instead of discovery path.
+`mbr watch <command>` should rerun the selected command when files change.
+`mbr watch workspace ...` should rerun workspace commands on file changes.
+`mbr watch --once` should run a single cycle and exit, which is useful for tests and scripting.
 Workspace and parallel output should be prefixed with the project or command name so multi-target runs stay readable.
 Failed workspace, parallel, and release commands should print a short summary with the target, exit code, and duration.
 `mbr package` should archive the configured project root into a local tarball or zip file.

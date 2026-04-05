@@ -34,6 +34,7 @@ mbr workspace --name api build
 mbr workspace --changed-only build
 mbr workspace --jobs 4 build
 mbr workspace --fail-fast build
+mbr watch --once build
 mbr parallel fmt lint test
 mbr workspace --list
 mbr workspace build
@@ -102,6 +103,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Supports workspace concurrency with `mbr workspace --jobs <n>`
 - Supports workspace failure policies with `--fail-fast` and `--keep-going`
 - Supports workspace ordering with `--order name`
+- Supports `mbr watch` for repeated execution on file changes
 - Supports pipeline commands with `steps = ["fmt", "lint", "test"]`
 - Prefixes workspace and parallel output with the project or command name
 - Prints failure summaries with exit code, target, and duration

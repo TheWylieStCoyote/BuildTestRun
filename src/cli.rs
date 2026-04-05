@@ -16,6 +16,7 @@ pub enum Action {
     Init(InitArgs),
     Templates(TemplatesArgs),
     Workspace(WorkspaceArgs),
+    Watch(WatchArgs),
     Package(PackageArgs),
     Release(ReleaseArgs),
     Completions(CompletionsArgs),
@@ -81,6 +82,7 @@ impl fmt::Display for Action {
             Action::Init(_) => f.write_str("init"),
             Action::Templates(_) => f.write_str("templates"),
             Action::Workspace(_) => f.write_str("workspace"),
+            Action::Watch(_) => f.write_str("watch"),
             Action::Package(_) => f.write_str("package"),
             Action::Release(_) => f.write_str("release"),
             Action::Completions(_) => f.write_str("completions"),
@@ -177,6 +179,30 @@ pub struct WorkspaceArgs {
 
     #[arg(value_name = "ARGS", last = true, allow_hyphen_values = true)]
     pub args: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Subcommand)]
+pub enum WatchAction {
+    Build(CommandArgs),
+    Test(CommandArgs),
+    Run(CommandArgs),
+    Dev(CommandArgs),
+    Fmt(CommandArgs),
+    Clean(CommandArgs),
+    Ci(CommandArgs),
+    Workspace(WorkspaceArgs),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Args)]
+pub struct WatchArgs {
+    #[command(subcommand)]
+    pub action: WatchAction,
+
+    #[arg(long)]
+    pub once: bool,
+
+    #[arg(long, value_name = "MILLIS", default_value_t = 1000)]
+    pub poll_interval: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]

@@ -32,6 +32,7 @@ pub fn execute(
         | Action::Init(_)
         | Action::Templates(_)
         | Action::Workspace(_)
+        | Action::Watch(_)
         | Action::Package(_)
         | Action::Release(_)
         | Action::Completions(_)
