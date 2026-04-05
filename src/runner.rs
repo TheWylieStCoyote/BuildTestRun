@@ -17,6 +17,7 @@ pub fn execute(
     config: &ProjectConfig,
     safe: bool,
     prefix: Option<&str>,
+    json_output: bool,
 ) -> Result<ExitStatus, Error> {
     let (command_name, args, action_label) = match action {
         Action::Build(CommandArgs { args }) => ("build".to_string(), args, "build".to_string()),
@@ -48,7 +49,15 @@ pub fn execute(
         eprintln!("[mbr] warning: project name is not set; command trust is lower");
     }
 
-    run_named_command(&command_name, &args, &action_label, config, safe, prefix)
+    run_named_command(
+        &command_name,
+        &args,
+        &action_label,
+        config,
+        safe,
+        prefix,
+        json_output,
+    )
 }
 
 fn unknown_command_error(name: &str) -> Error {
@@ -87,6 +96,7 @@ fn run_named_command(
     config: &ProjectConfig,
     safe: bool,
     prefix: Option<&str>,
+    json_output: bool,
 ) -> Result<ExitStatus, Error> {
     let command = config
         .commands
@@ -112,7 +122,15 @@ fn run_named_command(
 
         let mut last_status = None;
         for step in command.steps() {
-            last_status = Some(run_named_command(step, &[], step, config, safe, prefix)?);
+            last_status = Some(run_named_command(
+                step,
+                &[],
+                step,
+                config,
+                safe,
+                prefix,
+                json_output,
+            )?);
         }
 
         return Ok(last_status.expect("pipeline commands must have at least one step"));
@@ -122,7 +140,14 @@ fn run_named_command(
     let mut attempt = 0;
 
     loop {
-        let result = run_command_once(command, args, &config.root, &config.env, prefix);
+        let result = run_command_once(
+            command,
+            args,
+            &config.root,
+            &config.env,
+            prefix,
+            json_output,
+        );
         match result {
             Ok(status) if status.success() => return Ok(status),
             Ok(_) if attempt < retries => {
@@ -145,11 +170,15 @@ fn run_command_once(
     root: &Path,
     project_env: &std::collections::HashMap<String, String>,
     prefix: Option<&str>,
+    json_output: bool,
 ) -> Result<ExitStatus, Error> {
     let mut cmd = build_command(command, extra_args);
     cmd.current_dir(resolve_workdir(root, command.cwd()));
     cmd.stdin(Stdio::inherit());
-    if prefix.is_some() {
+    if json_output {
+        cmd.stdout(Stdio::null());
+        cmd.stderr(Stdio::null());
+    } else if prefix.is_some() {
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
     } else {

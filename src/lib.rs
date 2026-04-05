@@ -129,7 +129,7 @@ pub fn run_action(
 ) -> Result<i32, Error> {
     let (_, config) = load_project(start_dir, profile)?;
     let started = Instant::now();
-    let status = runner::execute(action.clone(), &config, safe, None)?;
+    let status = runner::execute(action.clone(), &config, safe, None, false)?;
     if !status.success() {
         print_failure_summary(
             None,
@@ -206,6 +206,22 @@ pub(crate) fn workspace_action(
 
     let mut exit_code = 0;
     let executed = projects.len();
+    let project_entries = if json_output {
+        Some(
+            projects
+                .iter()
+                .map(|(path, config)| {
+                    json!({
+                        "config": path,
+                        "root": config.root,
+                        "name": config.name,
+                    })
+                })
+                .collect::<Vec<_>>(),
+        )
+    } else {
+        None
+    };
     for (_, config) in projects {
         let started = Instant::now();
         if !json_output {
@@ -224,6 +240,7 @@ pub(crate) fn workspace_action(
             &config,
             safe,
             config.name.as_deref(),
+            json_output,
         ) {
             Ok(status) => {
                 if !status.success() {
@@ -238,6 +255,14 @@ pub(crate) fn workspace_action(
             }
             Err(err) => return Err(err),
         }
+    }
+
+    if let Some(projects) = project_entries {
+        print_stable_json(json_envelope(
+            "workspace",
+            if exit_code == 0 { "ok" } else { "error" },
+            vec![("projects", json!(projects))],
+        ));
     }
 
     print_command_summary(
@@ -1006,13 +1031,7 @@ pub fn package_action(
     json_output: bool,
 ) -> Result<i32, Error> {
     let (_, config) = load_project(start_dir, None)?;
-    let archive_path = output.unwrap_or_else(|| default_package_path(&config));
-
-    if cfg!(windows) {
-        create_zip_package(&config.root, &archive_path)?;
-    } else {
-        create_tar_gz_package(&config.root, &archive_path)?;
-    }
+    let archive_path = create_package(&config, output)?;
 
     if json_output {
         print_stable_json(json_envelope(
@@ -1030,6 +1049,21 @@ pub fn package_action(
     Ok(0)
 }
 
+fn create_package(
+    config: &config::ProjectConfig,
+    output: Option<PathBuf>,
+) -> Result<PathBuf, Error> {
+    let archive_path = output.unwrap_or_else(|| default_package_path(config));
+
+    if cfg!(windows) {
+        create_zip_package(&config.root, &archive_path)?;
+    } else {
+        create_tar_gz_package(&config.root, &archive_path)?;
+    }
+
+    Ok(archive_path)
+}
+
 pub fn release_action(
     start_dir: &Path,
     output: Option<PathBuf>,
@@ -1045,7 +1079,7 @@ pub fn release_action(
     ] {
         let started = Instant::now();
         let action_label = action.to_string();
-        let status = runner::execute(action, &config, false, None)?;
+        let status = runner::execute(action, &config, false, None, json_output)?;
         if !status.success() {
             print_failure_summary(
                 config.name.as_deref(),
@@ -1057,9 +1091,21 @@ pub fn release_action(
         }
     }
 
-    let status = package_action(start_dir, output, json_output)?;
-    print_command_summary("release", status == 0, 2, started.elapsed());
-    Ok(status)
+    let archive_path = create_package(&config, output)?;
+    if json_output {
+        print_stable_json(json_envelope(
+            "release",
+            "ok",
+            vec![
+                ("output", json!(archive_path)),
+                ("root", json!(config.root)),
+            ],
+        ));
+    } else {
+        println!("package: {}", archive_path.display());
+    }
+    print_command_summary("release", true, 2, started.elapsed());
+    Ok(0)
 }
 
 pub fn completions_action(shell: cli::CompletionShell) -> Result<i32, Error> {
@@ -1278,8 +1324,9 @@ fn describe_action(
     let sources = command_sources(start_dir, &config, command)?;
 
     if json_output {
+        let operation = if explain { "explain" } else { "show" };
         print_stable_json(json_envelope(
-            &name,
+            operation,
             "ok",
             vec![
                 ("config", json!(config_path)),
@@ -1385,11 +1432,12 @@ pub fn dry_run_action(
 
     if json_output {
         print_stable_json(json_envelope(
-            &command_name,
+            "dry-run",
             "ok",
             vec![
                 ("config", json!(config_path)),
                 ("root", json!(config.root)),
+                ("name", json!(command_name)),
                 ("rendered", json!(rendered)),
             ],
         ));
@@ -1472,6 +1520,7 @@ pub fn parallel_action(
                 &config,
                 safe,
                 Some(label.as_str()),
+                json_output,
             )
             .map(|status| (label, status, started.elapsed()))
         }));

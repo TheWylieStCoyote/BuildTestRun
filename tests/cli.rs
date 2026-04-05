@@ -302,6 +302,30 @@ fn validate_succeeds_for_valid_config() {
 }
 
 #[test]
+fn validate_json_has_stable_envelope() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        &format!("[commands]\nbuild = {}\n", print_command_spec("build-ok")),
+    );
+
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["--json", "validate"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("json output");
+    assert_eq!(value["status"], "ok");
+    assert_eq!(value["command"], "validate");
+    assert!(value["warnings"].as_array().is_some());
+}
+
+#[test]
 fn validate_strict_fails_for_missing_conventions() {
     let temp = TempDir::new().expect("temp dir");
     write_config(
@@ -364,6 +388,27 @@ fn init_writes_starter_config() {
     let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
     assert!(contents.contains("[commands]"));
     assert!(contents.contains("program = \"cargo\""));
+}
+
+#[test]
+fn init_json_has_stable_envelope() {
+    let temp = TempDir::new().expect("temp dir");
+
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["--json", "init", "--print"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("json output");
+    assert_eq!(value["status"], "ok");
+    assert_eq!(value["command"], "init");
+    assert!(value["rendered"].is_string());
+    assert_eq!(value["printed"], true);
 }
 
 #[test]
@@ -931,6 +976,34 @@ test = { program = "cargo", args = ["test"] }
 }
 
 #[test]
+fn list_json_has_stable_envelope() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = { program = "cargo", args = ["build"] }
+clean = { program = "cargo", args = ["clean"] }
+"#,
+    );
+
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["--json", "list"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("json output");
+    assert_eq!(value["status"], "ok");
+    assert_eq!(value["command"], "list");
+    assert!(value["commands"].as_array().is_some());
+}
+
+#[test]
 fn list_shows_command_descriptions() {
     let temp = TempDir::new().expect("temp dir");
     write_config(
@@ -996,6 +1069,34 @@ build = { program = "cargo", args = ["build"] }
         .assert()
         .success()
         .stdout(contains("cargo build --release"));
+}
+
+#[test]
+fn dry_run_json_has_stable_envelope() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = { program = "cargo", args = ["build"] }
+"#,
+    );
+
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["--json", "--dry-run", "build"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("json output");
+    assert_eq!(value["status"], "ok");
+    assert_eq!(value["command"], "dry-run");
+    assert_eq!(value["name"], "build");
+    assert!(value["rendered"].is_string());
 }
 
 #[test]
@@ -1079,6 +1180,34 @@ build = { program = "cargo", args = ["build", "--release"], description = "Profi
         .stdout(contains("source: platform override:"));
 
     assert!(nested.exists());
+}
+
+#[test]
+fn show_json_has_stable_envelope() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = { program = "cargo", args = ["build"] }
+"#,
+    );
+
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["--json", "show", "build"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("json output");
+    assert_eq!(value["status"], "ok");
+    assert_eq!(value["command"], "show");
+    assert_eq!(value["name"], "build");
+    assert!(value["sources"].as_array().is_some());
 }
 
 #[test]
@@ -1179,6 +1308,34 @@ fn parallel_runs_commands_concurrently() {
         ));
 
     assert!(start.elapsed() < std::time::Duration::from_secs(5));
+}
+
+#[test]
+fn parallel_json_has_stable_envelope() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        &format!(
+            "[commands]\none = {}\ntwo = {}\n",
+            sleep_and_print_command_spec("one"),
+            sleep_and_print_command_spec("two")
+        ),
+    );
+
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["--json", "parallel", "one", "two"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("json output");
+    assert_eq!(value["status"], "ok");
+    assert_eq!(value["command"], "parallel");
+    assert!(value["parallel"].as_array().is_some());
 }
 
 #[test]
@@ -1471,6 +1628,36 @@ ci = { steps = ["fmt", "lint"] }
 }
 
 #[test]
+fn explain_json_has_stable_envelope() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+fmt = { program = "cargo", args = ["fmt"] }
+lint = { program = "cargo", args = ["clippy"] }
+ci = { steps = ["fmt", "lint"] }
+"#,
+    );
+
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["--json", "explain", "ci"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("json output");
+    assert_eq!(value["status"], "ok");
+    assert_eq!(value["command"], "explain");
+    assert_eq!(value["name"], "ci");
+    assert!(value["sources"].as_array().is_some());
+}
+
+#[test]
 fn safe_mode_rejects_shell_commands() {
     let temp = TempDir::new().expect("temp dir");
     write_config(temp.path(), "[commands]\nbuild = \"echo unsafe\"\n");
@@ -1717,6 +1904,42 @@ fn workspace_runs_command_in_each_project() {
 }
 
 #[test]
+fn workspace_json_has_stable_envelope() {
+    let temp = TempDir::new().expect("temp dir");
+    let first = mkdir(temp.path(), "first");
+    let second = mkdir(temp.path(), "second");
+    write_config(
+        &first,
+        &format!(
+            "[project]\nname = \"first\"\n[commands]\nbuild = {}\n",
+            print_command_spec("first-ok")
+        ),
+    );
+    write_config(
+        &second,
+        &format!(
+            "[project]\nname = \"second\"\n[commands]\nbuild = {}\n",
+            print_command_spec("second-ok")
+        ),
+    );
+
+    let output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["--json", "workspace", "build"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("json output");
+    assert_eq!(value["status"], "ok");
+    assert_eq!(value["command"], "workspace");
+    assert!(value["projects"].is_null() || value["projects"].as_array().is_some());
+}
+
+#[test]
 fn workspace_reports_failed_command_summary() {
     let temp = TempDir::new().expect("temp dir");
     let workspace = mkdir(temp.path(), "project");
@@ -1764,6 +1987,26 @@ fn package_creates_an_archive() {
         .assert()
         .success();
 
+    let json_output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args([
+            "--json",
+            "package",
+            "--output",
+            output.to_string_lossy().as_ref(),
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&json_output).expect("json output");
+    assert_eq!(value["status"], "ok");
+    assert_eq!(value["command"], "package");
+    assert!(value["output"].is_string());
+
     assert!(output.exists());
     assert!(archive_contains_file(&output, "README.txt"));
     assert!(archive_contains_file(&output, ".mbr.toml"));
@@ -1796,6 +2039,26 @@ fn release_runs_build_test_and_packages() {
         .stdout(contains("build-ok"))
         .stdout(contains("test-ok"))
         .stderr(contains("[mbr] summary: command=release status=ok count=2"));
+
+    let json_output = Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args([
+            "--json",
+            "release",
+            "--output",
+            output.to_string_lossy().as_ref(),
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&json_output).expect("json output");
+    assert_eq!(value["status"], "ok");
+    assert_eq!(value["command"], "release");
+    assert!(value["output"].is_string());
 
     assert!(output.exists());
 }
