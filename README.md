@@ -98,8 +98,11 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Supports pipeline commands with `steps = ["fmt", "lint", "test"]`
 - Prefixes workspace and parallel output with the project or command name
 - Prints failure summaries with exit code, target, and duration
+- Prints end-of-run summaries for run, workspace, parallel, dry-run, and release
 - Checks for missing commands and PATH issues with `mbr doctor`
 - `mbr doctor` suggests fixes for missing PATH tools and env files
+- `mbr doctor --fix` creates missing configured env files when possible
+- `mbr show --source` prints an explicit provenance trace for config resolution
 - Supports `--dry-run` for execution commands
 - Supports per-command `cwd` and `timeout`
 - Uses the configured project root when provided

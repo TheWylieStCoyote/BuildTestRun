@@ -206,10 +206,16 @@ pub struct ListArgs {
 pub struct DoctorArgs {
     #[arg(long)]
     pub strict: bool,
+
+    #[arg(long)]
+    pub fix: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Args)]
 pub struct ShowArgs {
+    #[arg(long)]
+    pub source: bool,
+
     pub name: String,
 
     #[arg(value_name = "ARGS", last = true, allow_hyphen_values = true)]

@@ -5,13 +5,13 @@
 1. [x] `mbr workspace --changed-only --since <ref>`
 Let users choose the git base instead of only the default diff.
 
-2. Command summaries
+2. [x] Command summaries
 Print a short end-of-run summary: what ran, what failed, and how long it took.
 
-3. `mbr doctor --fix`
+3. [x] `mbr doctor --fix`
 Offer safe, obvious fixes for missing tools or missing config bits.
 
-4. `mbr show --source`
+4. [x] `mbr show --source`
 Make provenance for inherited values and overrides even more explicit.
 
 5. Finish JSON envelopes everywhere

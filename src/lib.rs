@@ -74,13 +74,18 @@ pub fn run_from_args() -> Result<i32, Error> {
             list_action(&start_dir, cli.json, args.verbose, cli.profile.as_deref())
         }
         Action::Which => which_action(&start_dir, cli.json, cli.profile.as_deref()),
-        Action::Doctor(args) => {
-            doctor_action(&start_dir, args.strict, cli.json, cli.profile.as_deref())
-        }
+        Action::Doctor(args) => doctor_action(
+            &start_dir,
+            args.strict,
+            args.fix,
+            cli.json,
+            cli.profile.as_deref(),
+        ),
         Action::Show(args) => show_action(
             &start_dir,
             args.name,
             args.args,
+            args.source,
             cli.json,
             cli.profile.as_deref(),
         ),
@@ -88,6 +93,7 @@ pub fn run_from_args() -> Result<i32, Error> {
             &start_dir,
             args.name,
             args.args,
+            args.source,
             cli.json,
             cli.profile.as_deref(),
         ),
@@ -132,6 +138,7 @@ pub fn run_action(
             started.elapsed(),
         );
     }
+    print_command_summary(&action.to_string(), status.success(), 1, started.elapsed());
     Ok(status.code().unwrap_or(1))
 }
 
@@ -144,6 +151,7 @@ pub(crate) fn workspace_action(
     safe: bool,
     profile: Option<&str>,
 ) -> Result<i32, Error> {
+    let started = Instant::now();
     let projects = discovery::discover_project_paths(start_dir)?;
     let projects =
         collect_workspace_projects(&projects, profile, selection.filter_name.as_deref())?;
@@ -197,6 +205,7 @@ pub(crate) fn workspace_action(
     };
 
     let mut exit_code = 0;
+    let executed = projects.len();
     for (_, config) in projects {
         let started = Instant::now();
         if !json_output {
@@ -230,6 +239,13 @@ pub(crate) fn workspace_action(
             Err(err) => return Err(err),
         }
     }
+
+    print_command_summary(
+        &format!("workspace {command_name}"),
+        exit_code == 0,
+        executed,
+        started.elapsed(),
+    );
 
     Ok(exit_code)
 }
@@ -1021,6 +1037,7 @@ pub fn release_action(
     profile: Option<&str>,
 ) -> Result<i32, Error> {
     let (_, config) = load_project(start_dir, profile)?;
+    let started = Instant::now();
 
     for action in [
         Action::Build(cli::CommandArgs { args: vec![] }),
@@ -1040,7 +1057,9 @@ pub fn release_action(
         }
     }
 
-    package_action(start_dir, output, json_output)
+    let status = package_action(start_dir, output, json_output)?;
+    print_command_summary("release", status == 0, 2, started.elapsed());
+    Ok(status)
 }
 
 pub fn completions_action(shell: cli::CompletionShell) -> Result<i32, Error> {
@@ -1168,10 +1187,15 @@ pub fn which_action(
 pub fn doctor_action(
     start_dir: &Path,
     strict: bool,
+    fix: bool,
     json_output: bool,
     profile: Option<&str>,
 ) -> Result<i32, Error> {
     let (config_path, config) = load_project(start_dir, profile)?;
+    let mut fixed = Vec::new();
+    if fix {
+        fixed = apply_doctor_fixes(&config)?;
+    }
     let warnings = validation_issues(&config);
     let suggestions = doctor_suggestions(&config, &warnings);
 
@@ -1184,11 +1208,17 @@ pub fn doctor_action(
                 ("root", json!(config.root)),
                 ("warnings", json!(warnings)),
                 ("suggestions", json!(suggestions)),
+                ("fixed", json!(fixed)),
             ],
         ));
     } else {
         println!("config: {}", config_path.display());
         println!("root: {}", config.root.display());
+        if !fixed.is_empty() {
+            for item in &fixed {
+                println!("fixed: {item}");
+            }
+        }
         if warnings.is_empty() {
             println!("status: ok");
         } else {
@@ -1208,26 +1238,29 @@ pub fn show_action(
     start_dir: &Path,
     name: String,
     args: Vec<String>,
+    source: bool,
     json_output: bool,
     profile: Option<&str>,
 ) -> Result<i32, Error> {
-    describe_action(start_dir, name, args, json_output, false, profile)
+    describe_action(start_dir, name, args, source, json_output, false, profile)
 }
 
 pub fn explain_action(
     start_dir: &Path,
     name: String,
     args: Vec<String>,
+    source: bool,
     json_output: bool,
     profile: Option<&str>,
 ) -> Result<i32, Error> {
-    describe_action(start_dir, name, args, json_output, true, profile)
+    describe_action(start_dir, name, args, source, json_output, true, profile)
 }
 
 fn describe_action(
     start_dir: &Path,
     name: String,
     args: Vec<String>,
+    source: bool,
     json_output: bool,
     explain: bool,
     profile: Option<&str>,
@@ -1258,12 +1291,28 @@ fn describe_action(
                 ("description", json!(command.description())),
                 ("shell", json!(command.is_shell())),
                 ("pipeline", json!(command.is_pipeline())),
+                ("source", json!(source)),
                 ("sources", json!(sources)),
             ],
         ));
     } else {
         println!("name: {name}");
         println!("command: {rendered}");
+        if source {
+            let config_chain = discovery::discover_config_chain(start_dir)?;
+            println!(
+                "config chain: {}",
+                config_chain
+                    .iter()
+                    .map(|path| path.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(" -> ")
+            );
+            match config.selected_profile.as_deref() {
+                Some(profile) => println!("selected profile: {profile}"),
+                None => println!("selected profile: (none)"),
+            }
+        }
         if explain {
             if command.is_pipeline() {
                 println!("type: pipeline");
@@ -1325,6 +1374,7 @@ pub fn dry_run_action(
 ) -> Result<i32, Error> {
     let (config_path, config) = load_project(start_dir, profile)?;
     trust_warning(&config);
+    let started = Instant::now();
     let (command_name, args) = action_command(&action);
     let command = config
         .commands
@@ -1347,6 +1397,13 @@ pub fn dry_run_action(
         println!("[mbr] dry-run: {rendered}");
     }
 
+    print_command_summary(
+        &format!("dry-run {command_name}"),
+        true,
+        1,
+        started.elapsed(),
+    );
+
     Ok(0)
 }
 
@@ -1360,6 +1417,7 @@ pub fn parallel_action(
 ) -> Result<i32, Error> {
     let (_, config) = load_project(start_dir, profile)?;
     trust_warning(&config);
+    let started = Instant::now();
 
     if dry_run {
         let commands: Vec<_> = names
@@ -1451,6 +1509,8 @@ pub fn parallel_action(
             vec![("parallel", json!(names))],
         ));
     }
+
+    print_command_summary("parallel", exit_code == 0, names.len(), started.elapsed());
 
     Ok(exit_code)
 }
@@ -1631,6 +1691,40 @@ fn doctor_suggestions(config: &config::ProjectConfig, warnings: &[String]) -> Ve
     suggestions
 }
 
+fn apply_doctor_fixes(config: &config::ProjectConfig) -> Result<Vec<String>, Error> {
+    let mut fixed = Vec::new();
+
+    for env_file in [
+        config.env_file.as_deref(),
+        config.profile_env_file.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        let path = config.root.join(env_file);
+        if path.exists() {
+            continue;
+        }
+
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|source| Error::ConfigWrite {
+                path: parent.to_path_buf(),
+                source,
+            })?;
+        }
+
+        fs::write(&path, b"").map_err(|source| Error::ConfigWrite {
+            path: path.clone(),
+            source,
+        })?;
+        fixed.push(format!("created env file {}", path.display()));
+    }
+
+    fixed.sort();
+    fixed.dedup();
+    Ok(fixed)
+}
+
 fn env_file_exists(root: &Path, env_file: &str) -> bool {
     root.join(env_file).is_file()
 }
@@ -1660,6 +1754,14 @@ fn placeholder_run_warning(name: &str, command: &config::CommandSpec) -> Option<
     }
 
     None
+}
+
+fn print_command_summary(name: &str, success: bool, count: usize, duration: std::time::Duration) {
+    let status = if success { "ok" } else { "warn" };
+    eprintln!(
+        "[mbr] summary: command={name} status={status} count={count} duration={}ms",
+        duration.as_millis()
+    );
 }
 
 fn resolve_workdir(root: &Path, cwd: Option<&str>) -> PathBuf {

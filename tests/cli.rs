@@ -156,7 +156,8 @@ fn build_runs_configured_command() {
         .arg("build")
         .assert()
         .success()
-        .stdout(contains("build-ok"));
+        .stdout(contains("build-ok"))
+        .stderr(contains("[mbr] summary: command=build status=ok count=1"));
 }
 
 #[test]
@@ -664,6 +665,35 @@ build = { program = "definitely-not-on-path-12345" }
 }
 
 #[test]
+fn doctor_fix_creates_missing_env_files() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+env_file = ".env.ci"
+
+[commands]
+build = "echo ok"
+test = "echo ok"
+run = "echo ok"
+fmt = "echo ok"
+clean = "echo ok"
+ci = "echo ok"
+"#,
+    );
+
+    Command::cargo_bin("mbr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["doctor", "--fix"])
+        .assert()
+        .success()
+        .stdout(contains("fixed: created env file"));
+
+    assert!(temp.path().join(".env.ci").exists());
+}
+
+#[test]
 fn init_list_templates_prints_catalog_without_writing() {
     let temp = TempDir::new().expect("temp dir");
 
@@ -1035,13 +1065,14 @@ build = { program = "cargo", args = ["build", "--release"], description = "Profi
         .expect("binary")
         .current_dir(nested.clone())
         .env("MBR_PROFILE", "dev")
-        .args(["show", "build"])
+        .args(["show", "--source", "build"])
         .assert()
         .success()
         .stdout(contains("name: build"))
         .stdout(contains("cargo build --locked"))
         .stdout(contains("cwd:"))
         .stdout(contains("Profile build"))
+        .stdout(contains("config chain:"))
         .stdout(contains("source: base config:"))
         .stdout(contains("source: child config:"))
         .stdout(contains("source: profile: dev"))
@@ -1142,7 +1173,10 @@ fn parallel_runs_commands_concurrently() {
         .success()
         .stdout(contains("[one] one"))
         .stdout(contains("[two] two"))
-        .stdout(contains("[three] three"));
+        .stdout(contains("[three] three"))
+        .stderr(contains(
+            "[mbr] summary: command=parallel status=ok count=3",
+        ));
 
     assert!(start.elapsed() < std::time::Duration::from_secs(5));
 }
@@ -1598,7 +1632,10 @@ fn workspace_filters_projects_by_changed_files() {
         .assert()
         .success()
         .stdout(contains("[second] second-changed"))
-        .stdout(predicates::str::contains("first-ok").not());
+        .stdout(predicates::str::contains("first-ok").not())
+        .stderr(contains(
+            "[mbr] summary: command=workspace build status=ok count=1",
+        ));
 
     Command::cargo_bin("mbr")
         .expect("binary")
@@ -1607,7 +1644,10 @@ fn workspace_filters_projects_by_changed_files() {
         .assert()
         .success()
         .stdout(contains("[second] second-changed"))
-        .stdout(predicates::str::contains("first-ok").not());
+        .stdout(predicates::str::contains("first-ok").not())
+        .stderr(contains(
+            "[mbr] summary: command=workspace build status=ok count=1",
+        ));
 }
 
 #[test]
@@ -1637,7 +1677,10 @@ fn workspace_runs_command_in_named_projects_only() {
         .assert()
         .success()
         .stdout(contains("[first] first-ok"))
-        .stdout(predicates::str::contains("second-ok").not());
+        .stdout(predicates::str::contains("second-ok").not())
+        .stderr(contains(
+            "[mbr] summary: command=workspace build status=ok count=1",
+        ));
 }
 
 #[test]
@@ -1667,7 +1710,10 @@ fn workspace_runs_command_in_each_project() {
         .assert()
         .success()
         .stdout(contains("[first] first-ok"))
-        .stdout(contains("[second] second-ok"));
+        .stdout(contains("[second] second-ok"))
+        .stderr(contains(
+            "[mbr] summary: command=workspace build status=ok count=2",
+        ));
 }
 
 #[test]
@@ -1748,7 +1794,8 @@ fn release_runs_build_test_and_packages() {
         .assert()
         .success()
         .stdout(contains("build-ok"))
-        .stdout(contains("test-ok"));
+        .stdout(contains("test-ok"))
+        .stderr(contains("[mbr] summary: command=release status=ok count=2"));
 
     assert!(output.exists());
 }
