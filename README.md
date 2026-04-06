@@ -1,4 +1,4 @@
-# MakeBuildRun
+# Build Test Run
 
 `btr` is a Rust CLI for running project-defined commands from a hidden project config file.
 

@@ -1,8 +1,8 @@
-# MakeBuildRun Project Specification
+# Build Test Run Project Specification
 
 ## Overview
 
-MakeBuildRun is a Rust command line tool that standardizes common project actions for arbitrary projects:
+Build Test Run is a Rust command line tool that standardizes common project actions for arbitrary projects:
 
 ```bash
 btr build

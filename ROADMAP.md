@@ -2,7 +2,7 @@
 
 ## Goals
 
-MakeBuildRun should support more than `build`, `test`, and `run`. The next useful capabilities are:
+Build Test Run should support more than `build`, `test`, and `run`. The next useful capabilities are:
 
 - argument passthrough
 - named commands
