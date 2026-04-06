@@ -1,59 +1,59 @@
 # MakeBuildRun
 
-`mbr` is a Rust CLI for running project-defined commands from a hidden project config file.
+`btr` is a Rust CLI for running project-defined commands from a hidden project config file.
 
 ## What It Does
 
-Each project contains a `.mbr.toml` file that defines how to build, test, run, lint, analyze, and execute other named commands. The CLI discovers that file automatically and executes the configured command for the action you choose.
+Each project contains a `.btr.toml` file that defines how to build, test, run, lint, analyze, and execute other named commands. The CLI discovers that file automatically and executes the configured command for the action you choose.
 
 ## Commands
 
 ```bash
-mbr build
-mbr test
-mbr run
-mbr dev
-mbr exec lint
-mbr validate --strict
-mbr --profile dev build
-mbr init --template node
-mbr init --interactive
-mbr init --detect
-mbr init --import
-mbr init --list-templates
-mbr init --template-file custom-template.toml
-mbr templates
-mbr list
-mbr list --verbose
-mbr which
-mbr schema
-mbr doctor --strict
-mbr show build
-mbr show --tree build
-mbr explain build
-mbr --workspace workspace build
-mbr workspace --name api build
-mbr workspace --tag web build
-mbr workspace --changed-only build
-mbr workspace --jobs 4 build
-mbr workspace --fail-fast build
-mbr watch --once build
-mbr parallel fmt lint test
-mbr --log-dir logs build
-mbr workspace --list
-mbr workspace build
-mbr package --output demo.tar.gz
-mbr release --output demo.tar.gz
-mbr completions bash
-mbr manpage
-mbr fmt
-mbr clean
-mbr ci
+btr build
+btr test
+btr run
+btr dev
+btr exec lint
+btr validate --strict
+btr --profile dev build
+btr init --template node
+btr init --interactive
+btr init --detect
+btr init --import
+btr init --list-templates
+btr init --template-file custom-template.toml
+btr templates
+btr list
+btr list --verbose
+btr which
+btr schema
+btr doctor --strict
+btr show build
+btr show --tree build
+btr explain build
+btr --workspace workspace build
+btr workspace --name api build
+btr workspace --tag web build
+btr workspace --changed-only build
+btr workspace --jobs 4 build
+btr workspace --fail-fast build
+btr watch --once build
+btr parallel fmt lint test
+btr --log-dir logs build
+btr workspace --list
+btr workspace build
+btr package --output demo.tar.gz
+btr release --output demo.tar.gz
+btr completions bash
+btr manpage
+btr fmt
+btr clean
+btr ci
 ```
 
 ## Config File
 
-Create a `.mbr.toml` file at the root of your project:
+Create a `.btr.toml` file at the root of your project:
 
 ```toml
 [project]
@@ -76,41 +76,41 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 
 ## Behavior
 
-- Finds `.mbr.toml` in the current directory or a parent directory
-- Merges parent `.mbr.toml` files with child overrides
+- Finds `.btr.toml` in the current directory or a parent directory
+- Merges parent `.btr.toml` files with child overrides
 - Runs the matching command for `build`, `test`, or `run`
 - Runs the matching command for `build`, `test`, `run`, or `dev`
-- Supports named commands via `mbr exec <name>`
+- Supports named commands via `btr exec <name>`
 - Forwards extra arguments after `--`
-- Validates config with `mbr validate`
+- Validates config with `btr validate`
 - Supports `--strict` for `validate` and `doctor`
 - Strict validation checks PATH availability, env files, and placeholder `run` commands
-- Generates a starter config with `mbr init --template <name>`
-- Supports interactive prompts with `mbr init --interactive`
-- Detects common project types with `mbr init --detect`
-- Imports common project files with `mbr init --import`
-- `mbr init --detect --interactive` uses the detected template as the default prompt
-- Prints starter configs with `mbr init --print`
+- Generates a starter config with `btr init --template <name>`
+- Supports interactive prompts with `btr init --interactive`
+- Detects common project types with `btr init --detect`
+- Imports common project files with `btr init --import`
+- `btr init --detect --interactive` uses the detected template as the default prompt
+- Prints starter configs with `btr init --print`
 - Interactive init can add template-specific optional commands and safe structured-only mode
-- Lists starter templates with `mbr templates` or `mbr init --list-templates`
-- Prints a JSON schema for `.mbr.toml` with `mbr schema`
-- Supports custom template files or directories with `mbr init --template-file <path>`
+- Lists starter templates with `btr templates` or `btr init --list-templates`
+- Prints a JSON schema for `.btr.toml` with `btr schema`
+- Supports custom template files or directories with `btr init --template-file <path>`
 - Interactive init can add optional command stubs and enable safe structured-only mode
 - Starter templates include rust, node, pnpm, yarn, bun, deno, nextjs, vite, turbo, nx, python, django, fastapi, flask, poetry, hatch, pixi, uv, go, cargo-workspace, java-gradle, java-maven, kotlin-gradle, dotnet, php-composer, ruby-bundler, rails, laravel, terraform, helm, docker-compose, cmake, cmake-ninja, and generic
 - Starter templates now include short descriptions in the template catalog
-- Lists commands and descriptions with `mbr list`
-- Shows resolved config with `mbr which`, including config chain and selected profile
-- Inspects a command with `mbr show <name>` and shows source provenance
-- Shows command inheritance and pipeline trees with `mbr show --tree <name>`
-- Explains a command with `mbr explain <name>` and shows source provenance
+- Lists commands and descriptions with `btr list`
+- Shows resolved config with `btr which`, including config chain and selected profile
+- Inspects a command with `btr show <name>` and shows source provenance
+- Shows command inheritance and pipeline trees with `btr show --tree <name>`
+- Explains a command with `btr explain <name>` and shows source provenance
 - JSON output now uses a stable envelope with `status` and `command`
 - Supports `--workspace <path>` to run from a nested project root
-- Runs multiple named commands concurrently with `mbr parallel <name>...`
-- Supports workspace concurrency with `mbr workspace --jobs <n>`
+- Runs multiple named commands concurrently with `btr parallel <name>...`
+- Supports workspace concurrency with `btr workspace --jobs <n>`
 - Supports workspace failure policies with `--fail-fast` and `--keep-going`
 - Supports workspace ordering with `--order name`
 - Supports workspace filtering with project tags via `--tag <tag>`
-- Supports `mbr watch` for repeated execution on file changes
+- Supports `btr watch` for repeated execution on file changes
 - Supports `[requirements]` for required tools, files, and env vars
 - Supports `[trust].shell_commands` to explicitly allow shell-based commands
 - Supports `--json-events` for streaming orchestration progress to stderr
@@ -119,10 +119,10 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Prefixes workspace and parallel output with the project or command name
 - Prints failure summaries with exit code, target, and duration
 - Prints end-of-run summaries for run, workspace, parallel, dry-run, and release
-- Checks for missing commands and PATH issues with `mbr doctor`
-- `mbr doctor` suggests fixes for missing PATH tools and env files
-- `mbr doctor --fix` creates missing configured env files when possible
-- `mbr show --source` prints an explicit provenance trace for config resolution
+- Checks for missing commands and PATH issues with `btr doctor`
+- `btr doctor` suggests fixes for missing PATH tools and env files
+- `btr doctor --fix` creates missing configured env files when possible
+- `btr show --source` prints an explicit provenance trace for config resolution
 - Supports `--dry-run` for execution commands
 - Supports per-command `cwd` and `timeout`
 - Uses the configured project root when provided
@@ -130,7 +130,7 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 - Streams command output directly to the terminal
 - Supports `extends` for derived commands that inherit arguments and environment by default
 - Supports `args_mode = "replace"` and `env_mode = "replace"` for derived commands
-- Supports profile overlays via `MBR_PROFILE`
+- Supports profile overlays via `BTR_PROFILE`
 - Supports `--profile <name>` to select a profile explicitly
 - Supports `env_file = ".env.ci"` for named env files
 - Supports `windows` and `unix` command overrides
@@ -158,7 +158,7 @@ Install the CLI locally with:
 
 ```bash
 ./install.sh
-./install.sh --install-completions /tmp/mbr-completions --install-manpage /tmp/mbr-manpages
+./install.sh --install-completions /tmp/btr-completions --install-manpage /tmp/btr-manpages
 ```
 
 Installer options:
@@ -172,7 +172,7 @@ Installer options:
 - `--install-manpage <dir>` to write the manpage
 
 ```bash
-./install.sh --root /tmp/mbr --debug --force
+./install.sh --root /tmp/btr --debug --force
 ./install.sh --check
 ./install.sh --help
 ```
@@ -191,9 +191,9 @@ Installer options:
 
 ## Common Extensions
 
-- Lint: `mbr exec lint`
-- Analysis: `mbr exec analyze`
-- CI: `mbr exec ci`
-- Format: `mbr fmt`
-- Clean: `mbr clean`
-- CI alias: `mbr ci`
+- Lint: `btr exec lint`
+- Analysis: `btr exec analyze`
+- CI: `btr exec ci`
+- Format: `btr fmt`
+- Clean: `btr clean`
+- CI alias: `btr ci`

@@ -51,7 +51,7 @@ pub fn execute(
         }
     };
     if config.name.is_none() {
-        eprintln!("[mbr] warning: project name is not set; command trust is lower");
+        eprintln!("[btr] warning: project name is not set; command trust is lower");
     }
 
     run_named_command(
@@ -112,7 +112,7 @@ fn run_named_command(
         .ok_or_else(|| unknown_command_error(command_name))?;
 
     if let Some(name) = config.name.as_deref() {
-        eprintln!("[mbr] project: {name} | command: {action_label}");
+        eprintln!("[btr] project: {name} | command: {action_label}");
     }
 
     if safe && command.is_shell() {

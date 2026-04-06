@@ -15,19 +15,19 @@ check = { program = "cargo", args = ["check"], timeout = 60 }
 Usage:
 
 ```bash
-mbr build -- --release
-mbr test -- my_test_name
-mbr exec lint
-mbr validate --strict
-mbr init --template node
-mbr init --interactive
-mbr init --template-file custom-template.toml
-mbr list
-mbr which
-mbr doctor --strict
-mbr show build
-mbr --workspace web build
-mbr parallel fmt lint test
+btr build -- --release
+btr test -- my_test_name
+btr exec lint
+btr validate --strict
+btr init --template node
+btr init --interactive
+btr init --template-file custom-template.toml
+btr list
+btr which
+btr doctor --strict
+btr show build
+btr --workspace web build
+btr parallel fmt lint test
 ```
 
 ## Node Project
@@ -80,8 +80,8 @@ run = { program = "cmake", args = ["--build", "build", "--target", "run"], descr
 
 ## Common Pattern
 
-Each project keeps a hidden `.mbr.toml` file at its root. The CLI discovers it automatically when you run commands from the project root or from any nested directory.
-Nested projects can add their own `.mbr.toml` files to override or extend parent commands.
+Each project keeps a hidden `.btr.toml` file at its root. The CLI discovers it automatically when you run commands from the project root or from any nested directory.
+Nested projects can add their own `.btr.toml` files to override or extend parent commands.
 
 Command tables can also inherit from other commands with `extends = "name"`.
 
@@ -113,7 +113,7 @@ build = { program = "cargo", args = ["build"], windows = { program = "cmd", args
 Safe mode rejects shell-string commands:
 
 ```bash
-mbr --safe build
+btr --safe build
 ```
 
 Retry failed commands when necessary:
@@ -126,35 +126,35 @@ build = { program = "cargo", args = ["build"], retries = 1 }
 Workspace mode runs a command in each discovered project:
 
 ```bash
-mbr workspace --list
-mbr workspace build
-mbr workspace --name api build
+btr workspace --list
+btr workspace build
+btr workspace --name api build
 ```
 
 Package a release archive locally:
 
 ```bash
-mbr package --output demo.tar.gz
+btr package --output demo.tar.gz
 ```
 
 Generate shell completions or a manpage:
 
 ```bash
-mbr completions bash
-mbr manpage
+btr completions bash
+btr manpage
 ```
 
 Interactive init:
 
 ```bash
-mbr init --interactive
+btr init --interactive
 ```
 
 Custom template file or directory:
 
 ```bash
-mbr init --template-file custom-template.toml
-mbr init --template-file custom-template-dir
+btr init --template-file custom-template.toml
+btr init --template-file custom-template-dir
 ```
 
 Pipeline commands avoid shell chaining:
@@ -168,8 +168,8 @@ ci = { steps = ["fmt", "lint", "test"] }
 ```
 
 ```bash
-mbr build
-mbr test
-mbr run
-mbr exec ci
+btr build
+btr test
+btr run
+btr exec ci
 ```

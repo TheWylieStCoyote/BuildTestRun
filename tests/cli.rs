@@ -6,7 +6,7 @@ use std::{fs, path::Path, process::Command as ProcessCommand};
 use tempfile::TempDir;
 
 fn write_config(dir: &Path, body: &str) {
-    fs::write(dir.join(".mbr.toml"), body).expect("write config");
+    fs::write(dir.join(".btr.toml"), body).expect("write config");
 }
 
 fn mkdir(dir: &Path, name: &str) -> std::path::PathBuf {
@@ -150,14 +150,14 @@ fn build_runs_configured_command() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("build")
         .assert()
         .success()
         .stdout(contains("build-ok"))
-        .stderr(contains("[mbr] summary: command=build status=ok count=1"));
+        .stderr(contains("[btr] summary: command=build status=ok count=1"));
 }
 
 #[test]
@@ -168,7 +168,7 @@ fn dev_runs_configured_command() {
         &format!("[commands]\ndev = {}\n", print_command_spec("dev-ok")),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("dev")
@@ -185,7 +185,7 @@ fn watch_once_runs_the_selected_command() {
         &format!("[commands]\nbuild = {}\n", print_command_spec("watch-ok")),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["watch", "--once", "build"])
@@ -202,7 +202,7 @@ fn build_forwards_extra_args() {
         &format!("[commands]\nbuild = {}\n", arg_pair_command_spec()),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["build", "--", "--release", "--target"])
@@ -223,7 +223,7 @@ fn executes_named_command() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["exec", "lint"])
@@ -246,7 +246,7 @@ fn fmt_clean_and_ci_run_project_commands() {
     );
 
     for (cmd, expected) in [("fmt", "fmt-ok"), ("clean", "clean-ok"), ("ci", "ci-ok")] {
-        Command::cargo_bin("mbr")
+        Command::cargo_bin("btr")
             .expect("binary")
             .current_dir(temp.path())
             .arg(cmd)
@@ -265,7 +265,7 @@ fn discovers_config_from_subdirectory() {
     );
     let nested = mkdir(temp.path(), "nested");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(nested)
         .arg("run")
@@ -278,13 +278,13 @@ fn discovers_config_from_subdirectory() {
 fn reports_missing_config() {
     let temp = TempDir::new().expect("temp dir");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("test")
         .assert()
         .failure()
-        .stderr(contains("no .mbr.toml found"));
+        .stderr(contains("no .btr.toml found"));
 }
 
 #[test]
@@ -292,7 +292,7 @@ fn reports_missing_command_group() {
     let temp = TempDir::new().expect("temp dir");
     write_config(temp.path(), "[project]\nname = \"demo\"");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("build")
@@ -309,7 +309,7 @@ fn validate_succeeds_for_valid_config() {
         &format!("[commands]\nbuild = {}\n", print_command_spec("build-ok")),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("validate")
@@ -326,7 +326,7 @@ fn validate_json_has_stable_envelope() {
         &format!("[commands]\nbuild = {}\n", print_command_spec("build-ok")),
     );
 
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["--json", "validate"])
@@ -353,7 +353,7 @@ build = { program = "cargo", args = ["build"] }
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["validate", "--strict"])
@@ -379,7 +379,7 @@ run = "echo run"
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["validate", "--strict"])
@@ -394,7 +394,7 @@ run = "echo run"
 fn init_writes_starter_config() {
     let temp = TempDir::new().expect("temp dir");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("init")
@@ -402,7 +402,7 @@ fn init_writes_starter_config() {
         .success()
         .stderr(contains("wrote"));
 
-    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    let contents = fs::read_to_string(temp.path().join(".btr.toml")).expect("read config");
     assert!(contents.contains("[commands]"));
     assert!(contents.contains("program = \"cargo\""));
 }
@@ -411,7 +411,7 @@ fn init_writes_starter_config() {
 fn init_json_has_stable_envelope() {
     let temp = TempDir::new().expect("temp dir");
 
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["--json", "init", "--print"])
@@ -432,12 +432,12 @@ fn init_json_has_stable_envelope() {
 fn init_prints_starter_config_without_writing() {
     let temp = TempDir::new().expect("temp dir");
     fs::write(
-        temp.path().join(".mbr.toml"),
+        temp.path().join(".btr.toml"),
         "[commands]\nbuild = \"echo existing\"\n",
     )
     .expect("seed config");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["init", "--print"])
@@ -446,7 +446,7 @@ fn init_prints_starter_config_without_writing() {
         .stdout(contains("[commands]"))
         .stdout(contains("program = \"cargo\""));
 
-    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    let contents = fs::read_to_string(temp.path().join(".btr.toml")).expect("read config");
     assert!(contents.contains("echo existing"));
 }
 
@@ -454,14 +454,14 @@ fn init_prints_starter_config_without_writing() {
 fn init_uses_requested_template() {
     let temp = TempDir::new().expect("temp dir");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["init", "--template", "node"])
         .assert()
         .success();
 
-    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    let contents = fs::read_to_string(temp.path().join(".btr.toml")).expect("read config");
     assert!(contents.contains("program = \"npm\""));
     assert!(contents.contains("run = { program = \"npm\""));
 }
@@ -495,14 +495,14 @@ fn init_detects_template_from_project_markers() {
         let temp = TempDir::new().expect("temp dir");
         fs::write(temp.path().join(file_name), contents).expect("write marker");
 
-        Command::cargo_bin("mbr")
+        Command::cargo_bin("btr")
             .expect("binary")
             .current_dir(temp.path())
             .args(["init", "--detect"])
             .assert()
             .success();
 
-        let rendered = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+        let rendered = fs::read_to_string(temp.path().join(".btr.toml")).expect("read config");
         assert!(
             rendered.contains(expected),
             "{file_name} should detect a matching template"
@@ -527,14 +527,14 @@ fn init_imports_package_json_scripts() {
     )
     .expect("write package.json");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["init", "--import"])
         .assert()
         .success();
 
-    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    let contents = fs::read_to_string(temp.path().join(".btr.toml")).expect("read config");
     assert!(contents.contains("name = \"web-app\""));
     assert!(contents.contains("\"build\" = { program = \"npm\", args = [\"run\", \"build\"]"));
     assert!(contents.contains("\"run\" = { program = \"npm\", args = [\"run\", \"start\"]"));
@@ -553,14 +553,14 @@ version = "0.1.0"
     )
     .expect("write pyproject");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["init", "--import"])
         .assert()
         .success();
 
-    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    let contents = fs::read_to_string(temp.path().join(".btr.toml")).expect("read config");
     assert!(contents.contains("name = \"demo\""));
     assert!(contents.contains("program = \"poetry\""));
 }
@@ -574,14 +574,14 @@ fn init_imports_makefile_targets() {
     )
     .expect("write makefile");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["init", "--import"])
         .assert()
         .success();
 
-    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    let contents = fs::read_to_string(temp.path().join(".btr.toml")).expect("read config");
     assert!(contents.contains("program = \"make\""));
     assert!(contents.contains("\"build\" = { program = \"make\", args = [\"build\"]"));
     assert!(contents.contains("\"test\" = { program = \"make\", args = [\"test\"]"));
@@ -596,7 +596,7 @@ fn init_detected_template_drives_interactive_prompts() {
     )
     .expect("write marker");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["init", "--detect", "--interactive"])
@@ -613,7 +613,7 @@ n
         .stdout(contains("Template [node]:"))
         .success();
 
-    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    let contents = fs::read_to_string(temp.path().join(".btr.toml")).expect("read config");
     assert!(contents.contains("program = \"npm\""));
     assert!(contents.contains("run = { program = \"npm\""));
 }
@@ -653,14 +653,14 @@ fn init_supports_extended_template_catalog() {
 
     for case in cases {
         let temp = TempDir::new().expect("temp dir");
-        Command::cargo_bin("mbr")
+        Command::cargo_bin("btr")
             .expect("binary")
             .current_dir(temp.path())
             .args(["init", "--template", case.0])
             .assert()
             .success();
 
-        let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+        let contents = fs::read_to_string(temp.path().join(".btr.toml")).expect("read config");
         assert!(contents.contains(case.1));
         if case.0 == "cmake-ninja" {
             assert!(contents.contains("Ninja"));
@@ -671,7 +671,7 @@ fn init_supports_extended_template_catalog() {
 #[test]
 fn templates_match_snapshot() {
     let temp = TempDir::new().expect("temp dir");
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("templates")
@@ -690,7 +690,7 @@ fn templates_match_snapshot() {
 fn templates_json_has_stable_envelope() {
     let temp = TempDir::new().expect("temp dir");
 
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["--json", "templates"])
@@ -727,10 +727,10 @@ build = "echo ok"
     );
     write_config(&nested, "[commands]\nbuild = \"echo ok\"\n");
 
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(&nested)
-        .env("MBR_PROFILE", "dev")
+        .env("BTR_PROFILE", "dev")
         .args(["--json", "which"])
         .assert()
         .success()
@@ -755,7 +755,7 @@ fn doctor_json_has_stable_envelope() {
         "[commands]\nbuild = \"echo ok\"\ntest = \"echo ok\"\nrun = \"echo ok\"\nfmt = \"echo ok\"\nclean = \"echo ok\"\nci = \"echo ok\"\n",
     );
 
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["--json", "doctor"])
@@ -785,7 +785,7 @@ build = { program = "definitely-not-on-path-12345" }
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("doctor")
@@ -825,7 +825,7 @@ env = ["REQUIRED_TOKEN"]
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("doctor")
@@ -870,7 +870,7 @@ shell_commands = false
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("doctor")
@@ -903,7 +903,7 @@ shell_commands = true
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("doctor")
@@ -930,7 +930,7 @@ ci = "echo ok"
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["doctor", "--fix"])
@@ -945,7 +945,7 @@ ci = "echo ok"
 fn init_list_templates_prints_catalog_without_writing() {
     let temp = TempDir::new().expect("temp dir");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["init", "--list-templates"])
@@ -953,13 +953,13 @@ fn init_list_templates_prints_catalog_without_writing() {
         .success()
         .stdout(contains("rust - Rust projects"));
 
-    assert!(!temp.path().join(".mbr.toml").exists());
+    assert!(!temp.path().join(".btr.toml").exists());
 }
 
 #[test]
 fn all_templates_render_valid_configs() {
     let temp = TempDir::new().expect("temp dir");
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("templates")
@@ -976,14 +976,14 @@ fn all_templates_render_valid_configs() {
         };
 
         let template_dir = TempDir::new().expect("template dir");
-        Command::cargo_bin("mbr")
+        Command::cargo_bin("btr")
             .expect("binary")
             .current_dir(template_dir.path())
             .args(["init", "--template", name])
             .assert()
             .success();
 
-        Command::cargo_bin("mbr")
+        Command::cargo_bin("btr")
             .expect("binary")
             .current_dir(template_dir.path())
             .arg("validate")
@@ -996,7 +996,7 @@ fn all_templates_render_valid_configs() {
 fn init_supports_interactive_prompts() {
     let temp = TempDir::new().expect("temp dir");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["init", "--interactive"])
@@ -1004,7 +1004,7 @@ fn init_supports_interactive_prompts() {
         .assert()
         .success();
 
-    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    let contents = fs::read_to_string(temp.path().join(".btr.toml")).expect("read config");
     assert!(contents.contains("name = \"demo\""));
     assert!(contents.contains("root = \"app\""));
     assert!(contents.contains("program = \"npm\""));
@@ -1014,7 +1014,7 @@ fn init_supports_interactive_prompts() {
 fn init_interactive_prompts_are_template_specific() {
     let temp = TempDir::new().expect("temp dir");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["init", "--interactive"])
@@ -1028,7 +1028,7 @@ n
         .assert()
         .success();
 
-    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    let contents = fs::read_to_string(temp.path().join(".btr.toml")).expect("read config");
     assert!(contents.contains("docs = { program = \"cargo\", args = [\"doc\"]"));
     assert!(contents.contains("lint = { program = \"cargo\", args = [\"clippy\""));
 }
@@ -1037,7 +1037,7 @@ n
 fn init_interactive_safe_mode_rejects_shell_templates() {
     let temp = TempDir::new().expect("temp dir");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["init", "--interactive"])
@@ -1046,14 +1046,14 @@ fn init_interactive_safe_mode_rejects_shell_templates() {
         .failure()
         .stderr(contains("safe init template forbids shell command"));
 
-    assert!(!temp.path().join(".mbr.toml").exists());
+    assert!(!temp.path().join(".btr.toml").exists());
 }
 
 #[test]
 fn init_generic_template_can_include_optional_commands() {
     let temp = TempDir::new().expect("temp dir");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["init", "--interactive"])
@@ -1061,7 +1061,7 @@ fn init_generic_template_can_include_optional_commands() {
         .assert()
         .success();
 
-    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    let contents = fs::read_to_string(temp.path().join(".btr.toml")).expect("read config");
     assert!(contents.contains("docs = \"echo docs\""));
     assert!(contents.contains("dev = \"echo dev\""));
     assert!(contents.contains("lint = \"echo lint\""));
@@ -1084,14 +1084,14 @@ build = "echo {{template}}"
     )
     .expect("write template");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["init", "--template-file", template.to_str().expect("path")])
         .assert()
         .success();
 
-    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    let contents = fs::read_to_string(temp.path().join(".btr.toml")).expect("read config");
     assert!(contents.contains("name = \"example\""));
     assert!(contents.contains("root = \".\""));
     assert!(contents.contains("echo rust"));
@@ -1114,7 +1114,7 @@ build = "echo {{template}}"
     )
     .expect("write template");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args([
@@ -1125,7 +1125,7 @@ build = "echo {{template}}"
         .assert()
         .success();
 
-    let contents = fs::read_to_string(temp.path().join(".mbr.toml")).expect("read config");
+    let contents = fs::read_to_string(temp.path().join(".btr.toml")).expect("read config");
     assert!(contents.contains("name = \"example\""));
     assert!(contents.contains("root = \".\""));
     assert!(contents.contains("echo rust"));
@@ -1137,7 +1137,7 @@ fn init_rejects_invalid_custom_template() {
     let template = temp.path().join("invalid-template.toml");
     fs::write(&template, "[project\nname = 'broken'\n").expect("write invalid template");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["init", "--template-file", template.to_str().expect("path")])
@@ -1145,7 +1145,7 @@ fn init_rejects_invalid_custom_template() {
         .failure()
         .stderr(contains("generated init template is invalid"));
 
-    assert!(!temp.path().join(".mbr.toml").exists());
+    assert!(!temp.path().join(".btr.toml").exists());
 }
 
 #[test]
@@ -1164,7 +1164,7 @@ test = { program = "cargo", args = ["test"] }
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("list")
@@ -1190,7 +1190,7 @@ clean = { program = "cargo", args = ["clean"] }
 "#,
     );
 
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["--json", "list"])
@@ -1217,7 +1217,7 @@ build = { program = "cargo", args = ["build"], description = "Compile the projec
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("list")
@@ -1242,7 +1242,7 @@ build = { program = "cargo", args = ["build"] }
     );
     write_config(&nested, "[commands]\nbuild = \"echo nested\"\n");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(&nested)
         .arg("which")
@@ -1265,7 +1265,7 @@ build = { program = "cargo", args = ["build"] }
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["--dry-run", "build", "--", "--release"])
@@ -1285,7 +1285,7 @@ build = { program = "cargo", args = ["build"] }
 "#,
     );
 
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["--json", "--dry-run", "build"])
@@ -1313,7 +1313,7 @@ build = { program = "cargo", args = ["build"] }
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("doctor")
@@ -1336,7 +1336,7 @@ run = { program = "cargo", args = ["run"] }
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["doctor", "--strict"])
@@ -1365,10 +1365,10 @@ build = { program = "cargo", args = ["build", "--release"], description = "Profi
         "[commands]\nbuild = { program = \"cargo\", args = [\"build\", \"--release\"], cwd = \"nested\", description = \"Child build\" }\n",
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(nested.clone())
-        .env("MBR_PROFILE", "dev")
+        .env("BTR_PROFILE", "dev")
         .args(["show", "--source", "build"])
         .assert()
         .success()
@@ -1396,7 +1396,7 @@ build = { program = "cargo", args = ["build"] }
 "#,
     );
 
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["--json", "show", "build"])
@@ -1431,7 +1431,7 @@ fn command_cwd_is_respected() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("run")
@@ -1453,7 +1453,7 @@ fn command_timeout_fails_cleanly() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("build")
@@ -1474,7 +1474,7 @@ build = { command = "sh -c 'echo log-out; echo log-err >&2'" }
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["--log-dir", logs.to_str().expect("logs path"), "build"])
@@ -1507,7 +1507,7 @@ fn workspace_override_is_respected() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["--workspace", "workspace", "build"])
@@ -1530,7 +1530,7 @@ fn parallel_runs_commands_concurrently() {
     );
 
     let start = std::time::Instant::now();
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["parallel", "one", "two", "three"])
@@ -1540,7 +1540,7 @@ fn parallel_runs_commands_concurrently() {
         .stdout(contains("[two] two"))
         .stdout(contains("[three] three"))
         .stderr(contains(
-            "[mbr] summary: command=parallel status=ok count=3",
+            "[btr] summary: command=parallel status=ok count=3",
         ));
 
     assert!(start.elapsed() < std::time::Duration::from_secs(5));
@@ -1558,7 +1558,7 @@ fn parallel_json_has_stable_envelope() {
         ),
     );
 
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["--json", "parallel", "one", "two"])
@@ -1586,7 +1586,7 @@ fn parallel_json_events_stream_to_stderr() {
         ),
     );
 
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["--json", "--json-events", "parallel", "one", "two"])
@@ -1614,13 +1614,13 @@ fn parallel_reports_failed_command_summary() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["parallel", "one", "two"])
         .assert()
         .failure()
-        .stderr(contains("[mbr] failed: command=one | exit=4"))
+        .stderr(contains("[btr] failed: command=one | exit=4"))
         .stderr(contains("duration="));
 }
 
@@ -1647,7 +1647,7 @@ fn child_config_inherits_parent_commands() {
         &format!("[commands]\nrun = {}\n", print_command_spec("child-run")),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(nested.clone())
         .arg("build")
@@ -1655,7 +1655,7 @@ fn child_config_inherits_parent_commands() {
         .success()
         .stdout(contains(expected_root));
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(nested)
         .arg("test")
@@ -1676,7 +1676,7 @@ release = { extends = "build", args = ["--release"], description = "Release buil
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["show", "release"])
@@ -1698,7 +1698,7 @@ release = { extends = "build", args_mode = "replace", args = ["build", "--releas
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["show", "release"])
@@ -1718,7 +1718,7 @@ fn command_extends_can_replace_env() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["exec", "release"])
@@ -1748,7 +1748,7 @@ fn os_specific_overrides_are_applied() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("build")
@@ -1769,9 +1769,9 @@ fn profile_overrides_commands_and_env() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
-        .env("MBR_PROFILE", "dev")
+        .env("BTR_PROFILE", "dev")
         .current_dir(temp.path())
         .arg("build")
         .assert()
@@ -1792,9 +1792,9 @@ fn profile_flag_overrides_environment() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
-        .env("MBR_PROFILE", "dev")
+        .env("BTR_PROFILE", "dev")
         .current_dir(temp.path())
         .args(["--profile", "ci", "build"])
         .assert()
@@ -1814,7 +1814,7 @@ fn project_env_file_is_loaded() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("build")
@@ -1836,9 +1836,9 @@ fn profile_env_file_is_loaded() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
-        .env("MBR_PROFILE", "ci")
+        .env("BTR_PROFILE", "ci")
         .current_dir(temp.path())
         .arg("build")
         .assert()
@@ -1857,7 +1857,7 @@ build = { program = "cargo", args = ["build"], description = "Compile" }
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["list", "--verbose"])
@@ -1880,7 +1880,7 @@ ci = { steps = ["fmt", "lint"] }
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["explain", "ci"])
@@ -1904,7 +1904,7 @@ ci = { steps = ["fmt", "lint"] }
 "#,
     );
 
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["--json", "explain", "ci"])
@@ -1926,7 +1926,7 @@ fn safe_mode_rejects_shell_commands() {
     let temp = TempDir::new().expect("temp dir");
     write_config(temp.path(), "[commands]\nbuild = \"echo unsafe\"\n");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["--safe", "build"])
@@ -1947,7 +1947,7 @@ fn dotenv_file_is_loaded_before_execution() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("build")
@@ -1964,7 +1964,7 @@ fn command_retries_failed_attempts() {
         &format!("[commands]\nbuild = {}\n", retrying_command_spec()),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("build")
@@ -1993,7 +1993,7 @@ fn workspace_lists_discovered_projects() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["workspace", "--list"])
@@ -2023,7 +2023,7 @@ fn workspace_filters_projects_by_name() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["workspace", "--name", "first", "--list"])
@@ -2053,7 +2053,7 @@ fn workspace_filters_projects_by_tag() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["workspace", "--tag", "web", "--list"])
@@ -2062,7 +2062,7 @@ fn workspace_filters_projects_by_tag() {
         .stdout(contains("name: first"))
         .stdout(predicates::str::contains("name: second").not());
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["workspace", "--tag", "web", "--tag", "api", "--list"])
@@ -2093,8 +2093,8 @@ fn workspace_filters_projects_by_changed_files() {
     );
 
     run_git(temp.path(), &["init", "-q"]);
-    run_git(temp.path(), &["config", "user.name", "mbr"]);
-    run_git(temp.path(), &["config", "user.email", "mbr@example.com"]);
+    run_git(temp.path(), &["config", "user.name", "btr"]);
+    run_git(temp.path(), &["config", "user.email", "btr@example.com"]);
     run_git(temp.path(), &["add", "."]);
     run_git(temp.path(), &["commit", "-q", "-m", "initial"]);
 
@@ -2106,7 +2106,7 @@ fn workspace_filters_projects_by_changed_files() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["workspace", "--changed-only", "--list"])
@@ -2115,7 +2115,7 @@ fn workspace_filters_projects_by_changed_files() {
         .stdout(contains("name: second"))
         .stdout(predicates::str::contains("name: first").not());
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["workspace", "--changed-only", "build"])
@@ -2124,10 +2124,10 @@ fn workspace_filters_projects_by_changed_files() {
         .stdout(contains("[second] second-changed"))
         .stdout(predicates::str::contains("first-ok").not())
         .stderr(contains(
-            "[mbr] summary: command=workspace build status=ok count=1",
+            "[btr] summary: command=workspace build status=ok count=1",
         ));
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["workspace", "--changed-only", "--since", "HEAD", "build"])
@@ -2136,7 +2136,7 @@ fn workspace_filters_projects_by_changed_files() {
         .stdout(contains("[second] second-changed"))
         .stdout(predicates::str::contains("first-ok").not())
         .stderr(contains(
-            "[mbr] summary: command=workspace build status=ok count=1",
+            "[btr] summary: command=workspace build status=ok count=1",
         ));
 }
 
@@ -2160,7 +2160,7 @@ fn workspace_runs_command_in_named_projects_only() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["workspace", "--name", "first", "build"])
@@ -2169,7 +2169,7 @@ fn workspace_runs_command_in_named_projects_only() {
         .stdout(contains("[first] first-ok"))
         .stdout(predicates::str::contains("second-ok").not())
         .stderr(contains(
-            "[mbr] summary: command=workspace build status=ok count=1",
+            "[btr] summary: command=workspace build status=ok count=1",
         ));
 }
 
@@ -2193,7 +2193,7 @@ fn workspace_runs_command_in_each_project() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["workspace", "build"])
@@ -2202,7 +2202,7 @@ fn workspace_runs_command_in_each_project() {
         .stdout(contains("[first] first-ok"))
         .stdout(contains("[second] second-ok"))
         .stderr(contains(
-            "[mbr] summary: command=workspace build status=ok count=2",
+            "[btr] summary: command=workspace build status=ok count=2",
         ));
 }
 
@@ -2227,7 +2227,7 @@ fn workspace_jobs_runs_projects_concurrently() {
     );
 
     let started = std::time::Instant::now();
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["workspace", "--jobs", "2", "build"])
@@ -2257,7 +2257,7 @@ fn workspace_fail_fast_stops_after_first_failure() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["workspace", "--fail-fast", "build"])
@@ -2266,7 +2266,7 @@ fn workspace_fail_fast_stops_after_first_failure() {
         .stdout(contains("first-fail"))
         .stdout(predicates::str::contains("second-ok").not())
         .stderr(contains(
-            "[mbr] summary: command=workspace build status=warn count=1",
+            "[btr] summary: command=workspace build status=warn count=1",
         ));
 }
 
@@ -2290,7 +2290,7 @@ fn workspace_order_name_changes_execution_order() {
         ),
     );
 
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["workspace", "--order", "name", "build"])
@@ -2326,7 +2326,7 @@ fn workspace_json_has_stable_envelope() {
         ),
     );
 
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["--json", "workspace", "build"])
@@ -2362,7 +2362,7 @@ fn workspace_json_events_stream_to_stderr() {
         ),
     );
 
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["--json", "--json-events", "workspace", "build"])
@@ -2390,7 +2390,7 @@ fn release_json_events_stream_to_stderr() {
         ),
     );
 
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["--json", "--json-events", "release"])
@@ -2419,14 +2419,14 @@ fn workspace_reports_failed_command_summary() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["workspace", "build"])
         .assert()
         .failure()
         .stderr(contains(
-            "[mbr] failed: project=project | command=build | exit=3",
+            "[btr] failed: project=project | command=build | exit=3",
         ))
         .stderr(contains("duration="));
 }
@@ -2448,14 +2448,14 @@ fn package_creates_an_archive() {
         "demo.tar.gz"
     });
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["package", "--output", output.to_string_lossy().as_ref()])
         .assert()
         .success();
 
-    let json_output = Command::cargo_bin("mbr")
+    let json_output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args([
@@ -2477,7 +2477,7 @@ fn package_creates_an_archive() {
 
     assert!(output.exists());
     assert!(archive_contains_file(&output, "README.txt"));
-    assert!(archive_contains_file(&output, ".mbr.toml"));
+    assert!(archive_contains_file(&output, ".btr.toml"));
 }
 
 #[test]
@@ -2498,7 +2498,7 @@ fn release_runs_build_test_and_packages() {
         "demo.tar.gz"
     });
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["release", "--output", output.to_string_lossy().as_ref()])
@@ -2506,9 +2506,9 @@ fn release_runs_build_test_and_packages() {
         .success()
         .stdout(contains("build-ok"))
         .stdout(contains("test-ok"))
-        .stderr(contains("[mbr] summary: command=release status=ok count=2"));
+        .stderr(contains("[btr] summary: command=release status=ok count=2"));
 
-    let json_output = Command::cargo_bin("mbr")
+    let json_output = Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args([
@@ -2535,32 +2535,32 @@ fn release_runs_build_test_and_packages() {
 fn completions_prints_shell_script() {
     let temp = TempDir::new().expect("temp dir");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["completions", "bash"])
         .assert()
         .success()
-        .stdout(contains("mbr"));
+        .stdout(contains("btr"));
 }
 
 #[test]
 fn manpage_prints_manual_page() {
     let temp = TempDir::new().expect("temp dir");
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("manpage")
         .assert()
         .success()
-        .stdout(contains("mbr"))
+        .stdout(contains("btr"))
         .stdout(contains("SYNOPSIS"));
 }
 
 #[test]
 fn schema_prints_json_schema() {
-    let output = Command::cargo_bin("mbr")
+    let output = Command::cargo_bin("btr")
         .expect("binary")
         .arg("schema")
         .assert()
@@ -2570,7 +2570,7 @@ fn schema_prints_json_schema() {
         .clone();
 
     let schema: Value = serde_json::from_slice(&output).expect("schema json");
-    assert_eq!(schema["title"], "mbr configuration");
+    assert_eq!(schema["title"], "btr configuration");
     assert!(schema["properties"]["commands"].is_object());
     assert!(schema["properties"]["requirements"].is_object());
     assert!(schema["$defs"]["command"].is_object());
@@ -2584,7 +2584,7 @@ fn warns_when_project_name_is_missing() {
         &format!("[commands]\nbuild = {}\n", print_command_spec("build-ok")),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("build")
@@ -2606,7 +2606,7 @@ fn pipeline_command_runs_named_steps() {
         ),
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("ci")
@@ -2630,7 +2630,7 @@ ci = { steps = ["fmt", "lint"] }
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["show", "ci"])
@@ -2654,7 +2654,7 @@ ci = { steps = ["fmt", "lint"] }
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["show", "--tree", "build"])
@@ -2665,7 +2665,7 @@ ci = { steps = ["fmt", "lint"] }
         .stdout(contains("extends: base"))
         .stdout(contains("- base"));
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .args(["show", "--tree", "ci"])
@@ -2691,7 +2691,7 @@ run = { program = "cargo", args = ["run"] }
 "#,
     );
 
-    Command::cargo_bin("mbr")
+    Command::cargo_bin("btr")
         .expect("binary")
         .current_dir(temp.path())
         .arg("doctor")

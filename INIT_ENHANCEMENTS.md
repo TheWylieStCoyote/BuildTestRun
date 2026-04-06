@@ -48,7 +48,7 @@
 
 ## Implemented Init UX
 
-- [x] Add `mbr init --interactive`.
+- [x] Add `btr init --interactive`.
 - [x] Prompt for project name.
 - [x] Prompt for template.
 - [x] Prompt for project root.
@@ -57,8 +57,8 @@
 
 ## Implemented Custom Templates
 
-- [x] Add support for `mbr init --template-file <path>`.
-- [x] Render placeholders before writing `.mbr.toml`.
+- [x] Add support for `btr init --template-file <path>`.
+- [x] Render placeholders before writing `.btr.toml`.
 - [x] Validate rendered TOML before writing.
 - [x] Add directory-based custom templates.
 

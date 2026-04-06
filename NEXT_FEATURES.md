@@ -4,7 +4,7 @@
 
 - [x] `--profile <name>` as a first-class CLI flag
 - [x] named env files like `env_file = ".env.ci"`
-- [x] `mbr release` as a first-class release workflow
+- [x] `btr release` as a first-class release workflow
 
 ## Priority 2
 
@@ -16,7 +16,7 @@
 
 - [x] template metadata and descriptions
 - [x] per-template optional prompts
-- [x] `mbr templates` or `mbr init --list-templates`
+- [x] `btr templates` or `btr init --list-templates`
 - [x] template snapshots and validation coverage
 
 ## Platform And Packaging

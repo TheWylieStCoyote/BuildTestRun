@@ -16,7 +16,7 @@ pub fn discover_config_chain(start: &Path) -> Result<Vec<PathBuf>, Error> {
     let mut found = Vec::new();
 
     loop {
-        let candidate = current.join(".mbr.toml");
+        let candidate = current.join(crate::constants::CONFIG_FILE_NAME);
         if candidate.is_file() {
             found.push(candidate);
         }
@@ -63,7 +63,9 @@ fn collect_project_paths(dir: &Path, projects: &mut Vec<PathBuf>) -> Result<(), 
 
         if path.is_dir() {
             collect_project_paths(&path, projects)?;
-        } else if path.file_name().and_then(|name| name.to_str()) == Some(".mbr.toml") {
+        } else if path.file_name().and_then(|name| name.to_str())
+            == Some(crate::constants::CONFIG_FILE_NAME)
+        {
             projects.push(path);
         }
     }

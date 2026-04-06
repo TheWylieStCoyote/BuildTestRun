@@ -1,5 +1,5 @@
 use crate::discovery;
-use crate::{cli::InitTemplate, error::Error};
+use crate::{cli::InitTemplate, constants, error::Error};
 use serde::{Deserialize, Deserializer, de::Error as DeError};
 use std::{
     collections::HashMap,
@@ -701,7 +701,7 @@ fn load_env_file(
 
 fn selected_profile_name(selected_profile: Option<&str>) -> Option<String> {
     selected_profile.map(|value| value.to_string()).or_else(|| {
-        std::env::var("MBR_PROFILE")
+        std::env::var(constants::PROFILE_ENV_VAR)
             .ok()
             .filter(|value| !value.is_empty())
     })
@@ -746,7 +746,7 @@ fn apply_selected_profile(
     let profile_name = selected_profile
         .map(|value| value.to_string())
         .or_else(|| {
-            std::env::var("MBR_PROFILE")
+            std::env::var(constants::PROFILE_ENV_VAR)
                 .ok()
                 .filter(|value| !value.is_empty())
         })

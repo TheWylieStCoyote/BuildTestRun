@@ -3,13 +3,13 @@
 ## Highest Impact
 
 1. [x] `init --import`
-Generate `.mbr.toml` from existing project files like `Cargo.toml`, `package.json`, `pyproject.toml`, `Makefile`, and `justfile`.
+Generate `.btr.toml` from existing project files like `Cargo.toml`, `package.json`, `pyproject.toml`, `Makefile`, and `justfile`.
 
 2. [x] Workspace controls
 Add `workspace --jobs <n>`, `--fail-fast`, `--keep-going`, and ordered execution options.
 
 3. [x] `watch` mode
-Add `mbr watch build`, `mbr watch test`, and `mbr watch workspace ...` for tight feedback loops.
+Add `btr watch build`, `btr watch test`, and `btr watch workspace ...` for tight feedback loops.
 
 ## Strong Follow-Ups
 
@@ -27,7 +27,7 @@ Keep stable final JSON envelopes, but add optional streaming events for long-run
 - [x] Project tags or selectors for workspace filtering
 - [x] A `show --tree` or graph view for inheritance and pipelines
 - [x] `--log-dir` for saved command output
-- [x] Editor-friendly schema or completion support for `.mbr.toml`
+- [x] Editor-friendly schema or completion support for `.btr.toml`
 - Named command parameters beyond raw passthrough args
 
 ## Avoid For Now

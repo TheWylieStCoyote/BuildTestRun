@@ -7,7 +7,7 @@ pub enum Error {
     #[error("failed to resolve current working directory: {0}")]
     CurrentDir(#[from] io::Error),
 
-    #[error("no .mbr.toml found starting from {start}")]
+    #[error("no .btr.toml found starting from {start}")]
     ConfigNotFound { start: PathBuf },
 
     #[error("config already exists at {path}")]

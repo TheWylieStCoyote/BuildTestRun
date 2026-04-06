@@ -12,25 +12,25 @@ Recommended built-in command names:
 - `fmt`
 - `clean`
 - `ci`
-- any custom command via `mbr exec <name>`
+- any custom command via `btr exec <name>`
 
 ## Typical Usage
 
 ```bash
-mbr build
-mbr test
-mbr run
-mbr fmt
-mbr clean
-mbr ci
-mbr exec lint
+btr build
+btr test
+btr run
+btr fmt
+btr clean
+btr ci
+btr exec lint
 ```
 
 ## Suggested Semantics
 
-- `mbr fmt` should format the project using the project-defined formatter.
-- `mbr clean` should remove generated build artifacts.
-- `mbr ci` should run the project's CI workflow.
+- `btr fmt` should format the project using the project-defined formatter.
+- `btr clean` should remove generated build artifacts.
+- `btr ci` should run the project's CI workflow.
 
 ## Example Node Config
 

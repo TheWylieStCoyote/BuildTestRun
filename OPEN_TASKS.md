@@ -5,12 +5,12 @@
 - [x] Pipeline commands (`steps = ["fmt", "lint", "test"]`)
 - [x] OS-specific overrides
 - [x] Profiles (`dev`, `release`, `ci`)
-- [x] Watch/dev mode via first-class `mbr dev`
+- [x] Watch/dev mode via first-class `btr dev`
 
 ## UX And Introspection
 
-- [x] `mbr list --verbose`
-- [x] `mbr explain`
+- [x] `btr list --verbose`
+- [x] `btr explain`
 - [x] Better JSON output stability
 
 ## Validation And Safety

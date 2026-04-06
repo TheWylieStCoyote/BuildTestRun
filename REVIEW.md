@@ -27,9 +27,9 @@ The README and spec describe validation and error handling more completely than 
 
 ## Suggested Next Features
 
-1. `mbr validate`
-2. `mbr init`
-3. Named custom commands with `mbr exec <name>`
+1. `btr validate`
+2. `btr init`
+3. Named custom commands with `btr exec <name>`
 4. Structured command definitions instead of shell strings
 5. Better runtime output for config path, working directory, and command summary
 
@@ -38,6 +38,6 @@ The README and spec describe validation and error handling more completely than 
 1. Fix or remove `project.shell`
 2. Add validation and clearer errors
 3. Add missing tests
-4. Add `mbr validate`
-5. Add `mbr init`
+4. Add `btr validate`
+5. Add `btr init`
 6. Consider structured commands

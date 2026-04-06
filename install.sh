@@ -78,7 +78,7 @@ while [ "$#" -gt 0 ]; do
             ;;
         --check)
             if ! command -v cargo >/dev/null 2>&1; then
-                printf '%s\n' 'error: cargo is required to install mbr' >&2
+                printf '%s\n' 'error: cargo is required to install btr' >&2
                 exit 1
             fi
             warn_path
@@ -111,7 +111,7 @@ while [ "$#" -gt 0 ]; do
             continue
             ;;
         --version)
-            printf '%s\n' 'mbr install script 1.0.0'
+            printf '%s\n' 'btr install script 1.0.0'
             exit 0
             continue
             ;;
@@ -125,7 +125,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 if ! command -v cargo >/dev/null 2>&1; then
-    printf '%s\n' 'error: cargo is required to install mbr' >&2
+    printf '%s\n' 'error: cargo is required to install btr' >&2
     exit 1
 fi
 
@@ -150,11 +150,11 @@ fi
 if [ -n "$completions_dir" ]; then
     mkdir -p "$completions_dir"
     for shell in bash elvish fish powershell zsh; do
-        cargo run --quiet --manifest-path "$crate_dir/Cargo.toml" -- completions "$shell" > "$completions_dir/mbr.$shell"
+        cargo run --quiet --manifest-path "$crate_dir/Cargo.toml" -- completions "$shell" > "$completions_dir/btr.$shell"
     done
 fi
 
 if [ -n "$manpage_dir" ]; then
     mkdir -p "$manpage_dir"
-    cargo run --quiet --manifest-path "$crate_dir/Cargo.toml" -- manpage > "$manpage_dir/mbr.1"
+    cargo run --quiet --manifest-path "$crate_dir/Cargo.toml" -- manpage > "$manpage_dir/btr.1"
 fi

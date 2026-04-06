@@ -2,6 +2,7 @@
 
 mod cli;
 mod config;
+mod constants;
 mod discovery;
 mod error;
 mod runner;
@@ -604,7 +605,7 @@ fn execute_workspace_projects(
                             failed.store(true, Ordering::SeqCst);
                             local_exit = 1;
                             eprintln!(
-                                "[mbr] failed: project={} | command={} | error={}",
+                                "[btr] failed: project={} | command={} | error={}",
                                 config.name.as_deref().unwrap_or("(unnamed)"),
                                 command_name,
                                 err
@@ -995,9 +996,9 @@ pub fn validate_action(
             eprintln!("warning: {warning}");
         }
     } else if let Some(name) = config.name.as_deref() {
-        eprintln!("[mbr] validated project: {name}");
+        eprintln!("[btr] validated project: {name}");
     } else {
-        eprintln!("[mbr] config valid");
+        eprintln!("[btr] config valid");
     }
 
     Ok(exit_code)
@@ -1026,7 +1027,7 @@ pub(crate) fn init_action(
         template
     };
 
-    let path = start_dir.join(".mbr.toml");
+    let path = start_dir.join(constants::CONFIG_FILE_NAME);
     if !options.print && path.exists() && !force {
         return Err(Error::ConfigExists { path });
     }
@@ -1074,7 +1075,7 @@ pub(crate) fn init_action(
     if json_output {
         print_stable_json(json_envelope("init", "ok", vec![("path", json!(path))]));
     } else {
-        eprintln!("[mbr] wrote {}", path.display());
+        eprintln!("[btr] wrote {}", path.display());
         if !options.r#import {
             for warning in template_warnings(template) {
                 eprintln!("warning: {warning}");
@@ -1861,7 +1862,12 @@ fn render_init_template(spec: &InitSpec, template_file: Option<PathBuf>) -> Resu
 
 fn read_template_source(path: &Path) -> Result<String, Error> {
     if path.is_dir() {
-        for candidate in [".mbr.toml", "template.toml", "mbr.toml", "init.toml"] {
+        for candidate in [
+            constants::CONFIG_FILE_NAME,
+            "template.toml",
+            "btr.toml",
+            "init.toml",
+        ] {
             let candidate_path = path.join(candidate);
             if candidate_path.is_file() {
                 return fs::read_to_string(&candidate_path).map_err(|source| Error::TemplateRead {
@@ -2149,7 +2155,12 @@ pub fn completions_action(shell: cli::CompletionShell) -> Result<i32, Error> {
         cli::CompletionShell::PowerShell => clap_complete::Shell::PowerShell,
         cli::CompletionShell::Zsh => clap_complete::Shell::Zsh,
     };
-    clap_complete::generate(shell, &mut command, "mbr", &mut std::io::stdout());
+    clap_complete::generate(
+        shell,
+        &mut command,
+        constants::BINARY_NAME,
+        &mut std::io::stdout(),
+    );
     Ok(0)
 }
 
@@ -2164,8 +2175,8 @@ pub fn schema_action() -> Result<i32, Error> {
 fn mbr_schema() -> Value {
     json!({
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "https://example.com/mbr.schema.json",
-        "title": "mbr configuration",
+        "$id": constants::SCHEMA_ID,
+        "title": "btr configuration",
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -2659,7 +2670,7 @@ pub fn dry_run_action(
             ],
         ));
     } else {
-        println!("[mbr] dry-run: {rendered}");
+        println!("[btr] dry-run: {rendered}");
     }
 
     print_command_summary(
@@ -2823,7 +2834,7 @@ fn print_failure_summary(
         parts.push(format!("exit={code}"));
     }
     parts.push(format!("duration={}ms", duration.as_millis()));
-    eprintln!("[mbr] failed: {}", parts.join(" | "));
+    eprintln!("[btr] failed: {}", parts.join(" | "));
 }
 
 fn program_on_path(program: &str) -> bool {
@@ -3138,7 +3149,7 @@ fn placeholder_run_warning(name: &str, command: &config::CommandSpec) -> Option<
 fn print_command_summary(name: &str, success: bool, count: usize, duration: std::time::Duration) {
     let status = if success { "ok" } else { "warn" };
     eprintln!(
-        "[mbr] summary: command={name} status={status} count={count} duration={}ms",
+        "[btr] summary: command={name} status={status} count={count} duration={}ms",
         duration.as_millis()
     );
 }
@@ -3302,7 +3313,7 @@ fn enforce_safe_command(
 
 fn trust_warning(config: &config::ProjectConfig) {
     if config.name.is_none() {
-        eprintln!("[mbr] warning: project name is not set; command trust is lower");
+        eprintln!("[btr] warning: project name is not set; command trust is lower");
     }
 }
 

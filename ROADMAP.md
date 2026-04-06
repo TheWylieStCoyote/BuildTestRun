@@ -12,7 +12,7 @@ MakeBuildRun should support more than `build`, `test`, and `run`. The next usefu
 
 ## Recommended Direction
 
-Use a generic command registry in `.mbr.toml` so projects can define commands like:
+Use a generic command registry in `.btr.toml` so projects can define commands like:
 
 ```toml
 [commands]
@@ -29,12 +29,12 @@ ci = { program = "cargo", args = ["fmt", "--check"] }
 Recommended commands:
 
 ```bash
-mbr build -- --release
-mbr test -- my_test_name
-mbr run -- --port 8080
-mbr exec lint
-mbr exec analyze
-mbr exec ci
+btr build -- --release
+btr test -- my_test_name
+btr run -- --port 8080
+btr exec lint
+btr exec analyze
+btr exec ci
 ```
 
 ## Why This Helps
@@ -48,6 +48,6 @@ mbr exec ci
 
 1. Add structured command definitions.
 2. Support passthrough arguments.
-3. Add `mbr exec <name>`.
+3. Add `btr exec <name>`.
 4. Add examples for lint, analyze, and CI.
 5. Add tests for passthrough and named commands.

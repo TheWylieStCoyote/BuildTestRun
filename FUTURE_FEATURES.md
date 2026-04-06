@@ -24,13 +24,13 @@ Useful for Windows vs Unix differences.
 
 ## UX And Introspection
 
-1. `mbr show <command>`
+1. `btr show <command>`
 Print the fully resolved command, cwd, env, and config source.
 
-2. `mbr list --verbose`
+2. `btr list --verbose`
 Show descriptions, command type, cwd, and env overrides.
 
-3. `mbr explain`
+3. `btr explain`
 Explain why a command resolved the way it did.
 
 4. Better JSON output
@@ -38,10 +38,10 @@ Keep machine-readable output stable for CI and editor integrations.
 
 ## Validation And Safety
 
-1. `mbr doctor --strict`
+1. `btr doctor --strict`
 Exit non-zero on real problems.
 
-2. `mbr validate --strict`
+2. `btr validate --strict`
 Fail on missing conventional commands like `build`, `test`, and `run`.
 
 3. Trust model
@@ -70,7 +70,7 @@ Helpful for flaky tooling.
 Run commands across multiple configured projects.
 
 2. Config inheritance
-Parent `.mbr.toml` with project overrides.
+Parent `.btr.toml` with project overrides.
 
 3. Project discovery
 List all configured projects under a repo.
@@ -96,13 +96,13 @@ Add templates for:
 ## Best Next Features
 
 1. `doctor --strict`
-2. `mbr show`
+2. `btr show`
 3. Per-command `cwd`
 4. Pipeline commands
 5. OS-specific overrides
 
 ## Suggested Priority
 
-- Short term: `doctor --strict`, `mbr show`, per-command `cwd`
+- Short term: `doctor --strict`, `btr show`, per-command `cwd`
 - Medium term: pipelines, OS overrides, profiles
 - Long term: workspace mode and config inheritance

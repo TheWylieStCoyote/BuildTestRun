@@ -11,15 +11,15 @@ Users may want to pass build or test flags such as:
 
 ## Recommended Approach
 
-Support argument passthrough from `mbr` to the underlying command.
+Support argument passthrough from `btr` to the underlying command.
 
 Example:
 
 ```bash
-mbr build -- --release
-mbr build -- --target wasm32-unknown-unknown
-mbr test -- my_test_name
-mbr run -- --port 8080
+btr build -- --release
+btr build -- --target wasm32-unknown-unknown
+btr test -- my_test_name
+btr run -- --port 8080
 ```
 
 This keeps the hidden project config simple:
@@ -33,9 +33,9 @@ run = "cargo run"
 
 ## Expected Behavior
 
-- `mbr build -- ...` forwards args to the configured build command.
-- `mbr test -- ...` forwards args to the configured test command.
-- `mbr run -- ...` forwards args to the configured run command.
+- `btr build -- ...` forwards args to the configured build command.
+- `btr test -- ...` forwards args to the configured test command.
+- `btr run -- ...` forwards args to the configured run command.
 
 ## Why This Works Well
 

@@ -138,6 +138,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "btr"
+version = "0.2.0"
+dependencies = [
+ "assert_cmd",
+ "clap",
+ "clap_complete",
+ "clap_mangen",
+ "flate2",
+ "predicates",
+ "serde",
+ "serde_json",
+ "tar",
+ "tempfile",
+ "thiserror",
+ "toml",
+ "zip",
+]
+
+[[package]]
 name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -535,25 +554,6 @@ name = "log"
 version = "0.4.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
-
-[[package]]
-name = "mbr"
-version = "0.2.0"
-dependencies = [
- "assert_cmd",
- "clap",
- "clap_complete",
- "clap_mangen",
- "flate2",
- "predicates",
- "serde",
- "serde_json",
- "tar",
- "tempfile",
- "thiserror",
- "toml",
- "zip",
-]
 
 [[package]]
 name = "memchr"
