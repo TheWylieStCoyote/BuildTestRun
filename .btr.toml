@@ -1,0 +1,16 @@
+[project]
+name = "example"
+root = "."
+
+[env]
+RUST_LOG = "info"
+
+[commands]
+build = { program = "cargo", args = ["build"], description = "Compile the project" }
+test = { program = "cargo", args = ["test"], description = "Run tests" }
+run = { program = "cargo", args = ["run"], description = "Run the app" }
+fmt = { program = "cargo", args = ["fmt", "--all"], description = "Format source files" }
+docs = { program = "cargo", args = ["doc"], description = "Generate documentation" }
+clean = { program = "cargo", args = ["clean"], description = "Remove build artifacts" }
+ci = { steps = ["fmt", "lint", "test"], description = "Run the standard checks" }
+lint = { program = "cargo", args = ["clippy", "--all-targets", "--all-features", "--", "-D", "warnings"], description = "Run Clippy" }
