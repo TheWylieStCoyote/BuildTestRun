@@ -177,6 +177,33 @@ Installer options:
 ./install.sh --help
 ```
 
+## Shell completion
+
+Generate a completion script for your shell:
+
+```bash
+btr completions bash   > ~/.local/share/bash-completion/completions/btr
+btr completions zsh    > "${fpath[1]}/_btr"
+btr completions fish   > ~/.config/fish/completions/btr.fish
+btr completions power-shell > btr.ps1
+btr completions elvish > btr.elv
+```
+
+Bash, Zsh, and Fish scripts include a dynamic wrapper that completes:
+
+- command names for `btr exec/show/explain/parallel <NAME>`
+- profile names for `btr --profile <NAME>`
+- workspace project names for `btr workspace --name <NAME>`
+- workspace tags for `btr workspace --tag <TAG>`
+
+Dynamic completion calls `btr` to read candidates from the `.btr.toml`
+discovered from the current directory, so `btr` must be on `PATH` at
+completion time. PowerShell and Elvish scripts include the static
+clap-generated completion plus path hints (no dynamic candidates).
+
+The `install.sh --install-completions <dir>` flag writes one script per
+shell into the given directory.
+
 ## Documentation
 
 - `SPEC.md` describes the project in detail

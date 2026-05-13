@@ -98,7 +98,7 @@ Workspace and parallel output should be prefixed with the project or command nam
 Failed workspace, parallel, and release commands should print a short summary with the target, exit code, and duration.
 `btr package` should archive the configured project root into a local tarball or zip file.
 `btr release` should run build and test before creating a package archive.
-`btr completions <shell>` should print a shell completion script.
+`btr completions <shell>` should print a shell completion script. Bash, Zsh, and Fish scripts include a dynamic wrapper backed by the hidden `btr complete <slot>` helper that completes command names, profile names, workspace project names, and workspace tags from the nearest `.btr.toml`.
 `btr manpage` should print the command manpage to stdout.
 `install.sh` should be able to write generated completions and the manpage into user-supplied directories.
 

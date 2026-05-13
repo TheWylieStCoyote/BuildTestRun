@@ -24,6 +24,12 @@ pub struct ProjectFile {
     pub commands: CommandsSection,
 }
 
+impl ProjectFile {
+    pub fn load(path: &Path) -> Result<Self, Error> {
+        load_file(path)
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct ProjectSection {
     pub name: Option<String>,

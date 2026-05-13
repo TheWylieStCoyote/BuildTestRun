@@ -1,6 +1,7 @@
 #![allow(clippy::result_large_err)]
 
 mod cli;
+pub mod completions;
 mod config;
 mod constants;
 mod discovery;
@@ -141,6 +142,7 @@ pub fn run_from_args() -> Result<i32, Error> {
             cli.log_dir.clone(),
             cli.profile.as_deref(),
         ),
+        Action::Complete(args) => complete_action(args, &start_dir, cli.profile.as_deref()),
         action => {
             if cli.dry_run {
                 dry_run_action(
@@ -886,7 +888,14 @@ fn filter_changed_workspace_projects(
 
 fn git_changed_paths(start_dir: &Path, since: Option<&str>) -> Result<Vec<PathBuf>, Error> {
     let repo_root = git_repo_root(start_dir)?;
+    let repo_root = repo_root.canonicalize().unwrap_or(repo_root);
     let mut changed = Vec::new();
+
+    let mut push_changed = |relative: &str| {
+        let joined = repo_root.join(relative.replace('/', std::path::MAIN_SEPARATOR_STR));
+        let canonical = joined.canonicalize().unwrap_or(joined);
+        changed.push(canonical);
+    };
 
     if let Some(since) = since {
         for args in [
@@ -909,7 +918,7 @@ fn git_changed_paths(start_dir: &Path, since: Option<&str>) -> Result<Vec<PathBu
                 if path.is_empty() {
                     continue;
                 }
-                changed.push(repo_root.join(path));
+                push_changed(path);
             }
         }
     } else {
@@ -934,7 +943,7 @@ fn git_changed_paths(start_dir: &Path, since: Option<&str>) -> Result<Vec<PathBu
             }
 
             let path = path.split(" -> ").last().unwrap_or(path);
-            changed.push(repo_root.join(path));
+            push_changed(path);
         }
     }
 
@@ -2147,21 +2156,88 @@ pub fn release_action(
 }
 
 pub fn completions_action(shell: cli::CompletionShell) -> Result<i32, Error> {
-    let mut command = Cli::command();
-    let shell = match shell {
-        cli::CompletionShell::Bash => clap_complete::Shell::Bash,
-        cli::CompletionShell::Elvish => clap_complete::Shell::Elvish,
-        cli::CompletionShell::Fish => clap_complete::Shell::Fish,
-        cli::CompletionShell::PowerShell => clap_complete::Shell::PowerShell,
-        cli::CompletionShell::Zsh => clap_complete::Shell::Zsh,
-    };
-    clap_complete::generate(
-        shell,
-        &mut command,
-        constants::BINARY_NAME,
-        &mut std::io::stdout(),
-    );
+    print!("{}", completions::render(shell));
     Ok(0)
+}
+
+pub fn complete_action(
+    args: cli::CompleteArgs,
+    fallback_start: &Path,
+    profile: Option<&str>,
+) -> Result<i32, Error> {
+    let start = args.cwd.as_deref().unwrap_or(fallback_start).to_path_buf();
+    let lines = match args.slot {
+        cli::CompleteSlot::Commands => complete_commands(&start, profile),
+        cli::CompleteSlot::Profiles => complete_profiles(&start),
+        cli::CompleteSlot::WorkspaceNames => complete_workspace_names(&start),
+        cli::CompleteSlot::WorkspaceTags => complete_workspace_tags(&start),
+        cli::CompleteSlot::Shells => Ok(vec![
+            "bash".to_string(),
+            "elvish".to_string(),
+            "fish".to_string(),
+            "powershell".to_string(),
+            "zsh".to_string(),
+        ]),
+    }
+    .unwrap_or_default();
+
+    for line in lines {
+        println!("{line}");
+    }
+    Ok(0)
+}
+
+fn complete_commands(start: &Path, profile: Option<&str>) -> Result<Vec<String>, Error> {
+    let config = config::ProjectConfig::load_inherited_with_profile(start, profile)?;
+    let mut names = config.commands.names();
+    names.sort();
+    names.dedup();
+    Ok(names)
+}
+
+fn complete_profiles(start: &Path) -> Result<Vec<String>, Error> {
+    let chain = discovery::discover_config_chain(start)?;
+    let mut names: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for path in chain {
+        if let Ok(file) = config::ProjectFile::load(&path) {
+            for key in file.profiles.keys() {
+                names.insert(key.clone());
+            }
+        }
+    }
+    Ok(names.into_iter().collect())
+}
+
+fn complete_workspace_names(start: &Path) -> Result<Vec<String>, Error> {
+    let projects = discovery::discover_project_paths(start)?;
+    let mut names: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for path in projects {
+        if let Ok(file) = config::ProjectFile::load(&path)
+            && let Some(project) = file.project
+            && let Some(name) = project.name
+            && !name.is_empty()
+        {
+            names.insert(name);
+        }
+    }
+    Ok(names.into_iter().collect())
+}
+
+fn complete_workspace_tags(start: &Path) -> Result<Vec<String>, Error> {
+    let projects = discovery::discover_project_paths(start)?;
+    let mut tags: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for path in projects {
+        if let Ok(file) = config::ProjectFile::load(&path)
+            && let Some(project) = file.project
+        {
+            for tag in project.tags {
+                if !tag.is_empty() {
+                    tags.insert(tag);
+                }
+            }
+        }
+    }
+    Ok(tags.into_iter().collect())
 }
 
 pub fn schema_action() -> Result<i32, Error> {
@@ -3287,7 +3363,8 @@ fn action_command(action: &Action) -> (String, Vec<String>) {
         | Action::Which
         | Action::Doctor(_)
         | Action::Show(_)
-        | Action::Explain(_) => {
+        | Action::Explain(_)
+        | Action::Complete(_) => {
             unreachable!()
         }
     }

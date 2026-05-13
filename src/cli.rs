@@ -1,4 +1,4 @@
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum, builder::ValueHint};
 use std::{fmt, path::PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq, Subcommand)]
@@ -27,6 +27,8 @@ pub enum Action {
     Doctor(DoctorArgs),
     Show(ShowArgs),
     Explain(ShowArgs),
+    #[command(hide = true)]
+    Complete(CompleteArgs),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -94,6 +96,7 @@ impl fmt::Display for Action {
             Action::Doctor(_) => f.write_str("doctor"),
             Action::Show(_) => f.write_str("show"),
             Action::Explain(_) => f.write_str("explain"),
+            Action::Complete(_) => f.write_str("__complete"),
         }
     }
 }
@@ -141,7 +144,7 @@ pub struct InitArgs {
     #[arg(long)]
     pub list_templates: bool,
 
-    #[arg(long, value_name = "PATH")]
+    #[arg(long, value_name = "PATH", value_hint = ValueHint::FilePath)]
     pub template_file: Option<PathBuf>,
 }
 
@@ -218,13 +221,13 @@ pub enum WorkspaceOrder {
 
 #[derive(Debug, Clone, PartialEq, Eq, Args)]
 pub struct PackageArgs {
-    #[arg(long)]
+    #[arg(long, value_hint = ValueHint::FilePath)]
     pub output: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Args)]
 pub struct ReleaseArgs {
-    #[arg(long)]
+    #[arg(long, value_hint = ValueHint::FilePath)]
     pub output: Option<PathBuf>,
 }
 
@@ -277,6 +280,24 @@ pub struct ShowArgs {
     pub args: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Args)]
+pub struct CompleteArgs {
+    #[arg(value_enum)]
+    pub slot: CompleteSlot,
+
+    #[arg(long, value_name = "PATH", value_hint = ValueHint::DirPath)]
+    pub cwd: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum CompleteSlot {
+    Commands,
+    Profiles,
+    WorkspaceNames,
+    WorkspaceTags,
+    Shells,
+}
+
 #[derive(Debug, Parser)]
 #[command(
     author,
@@ -296,13 +317,13 @@ pub struct Cli {
     #[arg(long = "json-events")]
     pub json_events: bool,
 
-    #[arg(long, value_name = "DIR")]
+    #[arg(long, value_name = "DIR", value_hint = ValueHint::DirPath)]
     pub log_dir: Option<PathBuf>,
 
     #[arg(long, value_name = "NAME")]
     pub profile: Option<String>,
 
-    #[arg(long, value_name = "PATH")]
+    #[arg(long, value_name = "PATH", value_hint = ValueHint::DirPath)]
     pub workspace: Option<PathBuf>,
 
     #[command(subcommand)]

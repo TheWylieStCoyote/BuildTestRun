@@ -46,7 +46,8 @@ pub fn execute(
         | Action::Doctor(_)
         | Action::Show(_)
         | Action::Explain(_)
-        | Action::Parallel(_) => {
+        | Action::Parallel(_)
+        | Action::Complete(_) => {
             unreachable!()
         }
     };

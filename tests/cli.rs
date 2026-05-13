@@ -683,7 +683,7 @@ fn templates_match_snapshot() {
 
     let actual = String::from_utf8(output).expect("utf8 output");
     let expected = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/TEMPLATE_CATALOG.txt"));
-    assert_eq!(actual, expected);
+    assert_eq!(actual.replace("\r\n", "\n"), expected.replace("\r\n", "\n"));
 }
 
 #[test]
@@ -1466,13 +1466,12 @@ fn command_timeout_fails_cleanly() {
 fn log_dir_writes_command_output() {
     let temp = TempDir::new().expect("temp dir");
     let logs = mkdir(temp.path(), "logs");
-    write_config(
-        temp.path(),
-        r#"
-[commands]
-build = { command = "sh -c 'echo log-out; echo log-err >&2'" }
-"#,
-    );
+    let build_spec = if cfg!(windows) {
+        r#"{ program = "powershell", args = ["-NoProfile", "-Command", "Write-Output 'log-out'; [Console]::Error.WriteLine('log-err')"] }"#
+    } else {
+        r#"{ program = "sh", args = ["-c", "echo log-out; echo log-err >&2"] }"#
+    };
+    write_config(temp.path(), &format!("[commands]\nbuild = {build_spec}\n"));
 
     Command::cargo_bin("btr")
         .expect("binary")
@@ -2700,4 +2699,344 @@ run = { program = "cargo", args = ["run"] }
         .stdout(contains("missing fmt command"))
         .stdout(contains("missing clean command"))
         .stdout(contains("missing ci command"));
+}
+
+const COMPLETION_SENTINEL_START: &str = "# >>> btr dynamic completion >>>";
+const COMPLETION_SENTINEL_END: &str = "# <<< btr dynamic completion <<<";
+
+fn run_complete(cwd: &Path, slot: &str) -> assert_cmd::assert::Assert {
+    Command::cargo_bin("btr")
+        .expect("binary")
+        .current_dir(cwd)
+        .args(["complete", slot])
+        .assert()
+}
+
+#[test]
+fn complete_commands_lists_command_keys() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = { program = "echo", args = ["x"] }
+lint = { program = "echo", args = ["x"] }
+custom_thing = { program = "echo", args = ["x"] }
+"#,
+    );
+
+    let output = run_complete(temp.path(), "commands")
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let lines: Vec<&str> = std::str::from_utf8(&output)
+        .expect("utf-8")
+        .lines()
+        .collect();
+    assert_eq!(lines, vec!["build", "custom_thing", "lint"]);
+}
+
+#[test]
+fn complete_commands_walks_up_from_subdir() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = { program = "echo", args = ["x"] }
+test = { program = "echo", args = ["x"] }
+"#,
+    );
+    let nested = mkdir(temp.path(), "sub/nested");
+
+    let output = Command::cargo_bin("btr")
+        .expect("binary")
+        .current_dir(&nested)
+        .args(["complete", "commands"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let lines: Vec<&str> = std::str::from_utf8(&output)
+        .expect("utf-8")
+        .lines()
+        .collect();
+    assert_eq!(lines, vec!["build", "test"]);
+}
+
+#[test]
+fn complete_profiles_lists_profile_keys() {
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = { program = "echo", args = ["x"] }
+
+[profiles.dev]
+[profiles.prod]
+"#,
+    );
+
+    let output = run_complete(temp.path(), "profiles")
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let lines: Vec<&str> = std::str::from_utf8(&output)
+        .expect("utf-8")
+        .lines()
+        .collect();
+    assert_eq!(lines, vec!["dev", "prod"]);
+}
+
+#[test]
+fn complete_workspace_names_from_tree() {
+    let temp = TempDir::new().expect("temp dir");
+    let alpha = mkdir(temp.path(), "a");
+    write_config(
+        &alpha,
+        r#"
+[project]
+name = "alpha"
+
+[commands]
+build = { program = "echo", args = ["x"] }
+"#,
+    );
+    let beta = mkdir(temp.path(), "b");
+    write_config(
+        &beta,
+        r#"
+[project]
+name = "beta"
+
+[commands]
+build = { program = "echo", args = ["x"] }
+"#,
+    );
+
+    let output = run_complete(temp.path(), "workspace-names")
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let lines: Vec<&str> = std::str::from_utf8(&output)
+        .expect("utf-8")
+        .lines()
+        .collect();
+    assert_eq!(lines, vec!["alpha", "beta"]);
+}
+
+#[test]
+fn complete_workspace_tags_deduped() {
+    let temp = TempDir::new().expect("temp dir");
+    let one = mkdir(temp.path(), "p1");
+    write_config(
+        &one,
+        r#"
+[project]
+name = "one"
+tags = ["api", "rust"]
+
+[commands]
+build = { program = "echo", args = ["x"] }
+"#,
+    );
+    let two = mkdir(temp.path(), "p2");
+    write_config(
+        &two,
+        r#"
+[project]
+name = "two"
+tags = ["rust", "web"]
+
+[commands]
+build = { program = "echo", args = ["x"] }
+"#,
+    );
+
+    let output = run_complete(temp.path(), "workspace-tags")
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let lines: Vec<&str> = std::str::from_utf8(&output)
+        .expect("utf-8")
+        .lines()
+        .collect();
+    assert_eq!(lines, vec!["api", "rust", "web"]);
+}
+
+#[test]
+fn complete_no_config_is_graceful() {
+    let temp = TempDir::new().expect("temp dir");
+
+    let assert = run_complete(temp.path(), "commands").success();
+    let output = assert.get_output();
+    assert!(output.stdout.is_empty(), "stdout should be empty");
+    assert!(output.stderr.is_empty(), "stderr should be empty");
+}
+
+#[test]
+fn complete_honors_workspace_flag() {
+    let temp = TempDir::new().expect("temp dir");
+    let project = mkdir(temp.path(), "project");
+    write_config(
+        &project,
+        r#"
+[commands]
+build = { program = "echo", args = ["x"] }
+ship = { program = "echo", args = ["x"] }
+"#,
+    );
+    let outside = TempDir::new().expect("outside dir");
+
+    let output = Command::cargo_bin("btr")
+        .expect("binary")
+        .current_dir(outside.path())
+        .args(["--workspace"])
+        .arg(&project)
+        .args(["complete", "commands"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let lines: Vec<&str> = std::str::from_utf8(&output)
+        .expect("utf-8")
+        .lines()
+        .collect();
+    assert_eq!(lines, vec!["build", "ship"]);
+}
+
+#[test]
+fn complete_shells_lists_supported_shells() {
+    let temp = TempDir::new().expect("temp dir");
+
+    let output = run_complete(temp.path(), "shells")
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let lines: Vec<&str> = std::str::from_utf8(&output)
+        .expect("utf-8")
+        .lines()
+        .collect();
+    assert_eq!(lines, vec!["bash", "elvish", "fish", "powershell", "zsh"]);
+}
+
+#[test]
+fn completions_bash_includes_dynamic_wrapper() {
+    let temp = TempDir::new().expect("temp dir");
+
+    Command::cargo_bin("btr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["completions", "bash"])
+        .assert()
+        .success()
+        .stdout(contains(COMPLETION_SENTINEL_START))
+        .stdout(contains(COMPLETION_SENTINEL_END))
+        .stdout(contains("_btr_dynamic"))
+        .stdout(contains("complete -F _btr_dynamic"));
+}
+
+#[test]
+fn completions_zsh_includes_dynamic_wrapper() {
+    let temp = TempDir::new().expect("temp dir");
+
+    Command::cargo_bin("btr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["completions", "zsh"])
+        .assert()
+        .success()
+        .stdout(contains(COMPLETION_SENTINEL_START))
+        .stdout(contains("compdef _btr_dynamic btr"));
+}
+
+#[test]
+fn completions_fish_emits_dynamic_complete_lines() {
+    let temp = TempDir::new().expect("temp dir");
+
+    Command::cargo_bin("btr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["completions", "fish"])
+        .assert()
+        .success()
+        .stdout(contains(COMPLETION_SENTINEL_START))
+        .stdout(contains("__fish_seen_subcommand_from exec"))
+        .stdout(contains("btr complete commands"));
+}
+
+#[test]
+fn completions_powershell_omits_dynamic_wrapper() {
+    let temp = TempDir::new().expect("temp dir");
+
+    Command::cargo_bin("btr")
+        .expect("binary")
+        .current_dir(temp.path())
+        .args(["completions", "power-shell"])
+        .assert()
+        .success()
+        .stdout(contains("btr").and(contains(COMPLETION_SENTINEL_START).not()));
+}
+
+#[cfg(unix)]
+#[test]
+fn complete_bash_subshell_smoke() {
+    if which_program("bash").is_none() {
+        return;
+    }
+
+    let temp = TempDir::new().expect("temp dir");
+    write_config(
+        temp.path(),
+        r#"
+[commands]
+build = { program = "echo", args = ["x"] }
+custom = { program = "echo", args = ["x"] }
+"#,
+    );
+
+    let btr_path = assert_cmd::cargo::cargo_bin("btr");
+    let script = format!(
+        r#"
+        export PATH="{bin_dir}:$PATH"
+        eval "$(btr completions bash)"
+        COMP_WORDS=(btr exec "")
+        COMP_CWORD=2
+        _btr_dynamic
+        printf '%s\n' "${{COMPREPLY[@]}}"
+        "#,
+        bin_dir = btr_path.parent().expect("bin dir").display(),
+    );
+
+    let output = ProcessCommand::new("bash")
+        .current_dir(temp.path())
+        .arg("-c")
+        .arg(&script)
+        .output()
+        .expect("run bash");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("build") && stdout.contains("custom"),
+        "expected commands in bash completion output, got: {stdout}"
+    );
+}
+
+#[cfg(unix)]
+fn which_program(name: &str) -> Option<std::path::PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&path) {
+        let candidate = dir.join(name);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
 }
