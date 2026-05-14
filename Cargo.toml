@@ -1,6 +1,6 @@
 [package]
 name = "btr"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2024"
 description = "CLI to standardize build, test, and run commands across projects"
 license = "MIT"
