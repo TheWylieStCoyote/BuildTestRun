@@ -29,6 +29,7 @@ pub enum Action {
     Explain(ShowArgs),
     #[command(hide = true)]
     Complete(CompleteArgs),
+    InstallCompletions(InstallCompletionsArgs),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -97,6 +98,7 @@ impl fmt::Display for Action {
             Action::Show(_) => f.write_str("show"),
             Action::Explain(_) => f.write_str("explain"),
             Action::Complete(_) => f.write_str("__complete"),
+            Action::InstallCompletions(_) => f.write_str("install-completions"),
         }
     }
 }
@@ -296,6 +298,24 @@ pub enum CompleteSlot {
     WorkspaceNames,
     WorkspaceTags,
     Shells,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Args)]
+pub struct InstallCompletionsArgs {
+    #[arg(long, value_enum)]
+    pub shell: Option<CompletionShell>,
+
+    #[arg(long, value_name = "PATH", value_hint = ValueHint::FilePath)]
+    pub dest: Option<PathBuf>,
+
+    #[arg(long)]
+    pub force: bool,
+
+    #[arg(long)]
+    pub print_path: bool,
+
+    #[arg(long)]
+    pub no_hint: bool,
 }
 
 #[derive(Debug, Parser)]

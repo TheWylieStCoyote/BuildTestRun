@@ -31,6 +31,23 @@ Dynamic candidates are read by re-invoking `btr`, so:
 
 ## Setup
 
+### One-shot (any shell, from the installed binary)
+
+The fastest path — works for users who installed via `cargo install btr` and
+never cloned the repo:
+
+```bash
+btr install-completions                    # auto-detects from $SHELL
+btr install-completions --shell zsh
+btr install-completions --print-path       # show where it would write
+btr install-completions --dest ./btr.bash --shell bash
+btr install-completions --shell bash --force        # overwrite existing
+btr install-completions --shell bash --no-hint      # silence setup tips
+```
+
+Supports `bash`, `zsh`, `fish`. PowerShell and Elvish print the manual
+command to run instead.
+
 ### Bash
 
 ```bash

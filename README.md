@@ -179,7 +179,16 @@ Installer options:
 
 ## Shell completion
 
-Generate a completion script for your shell:
+Easiest path — let `btr` install the script for you (bash, zsh, fish):
+
+```bash
+btr install-completions          # auto-detects from $SHELL
+btr install-completions --shell zsh
+btr install-completions --print-path     # show where it would write
+btr install-completions --dest ./btr.bash --shell bash   # write somewhere else
+```
+
+Or print to stdout and redirect yourself:
 
 ```bash
 btr completions bash   > ~/.local/share/bash-completion/completions/btr

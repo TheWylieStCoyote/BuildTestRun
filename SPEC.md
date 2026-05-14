@@ -99,6 +99,7 @@ Failed workspace, parallel, and release commands should print a short summary wi
 `btr package` should archive the configured project root into a local tarball or zip file.
 `btr release` should run build and test before creating a package archive.
 `btr completions <shell>` should print a shell completion script. Bash, Zsh, and Fish scripts include a dynamic wrapper backed by the hidden `btr complete <slot>` helper that completes command names, profile names, workspace project names, and workspace tags from the nearest `.btr.toml`.
+`btr install-completions` should write the completion script for the user's shell into the conventional per-shell user directory (XDG-aware: `XDG_DATA_HOME`/`ZDOTDIR`/`XDG_CONFIG_HOME`, falling back to `$HOME`). Supports `--shell <bash|zsh|fish>` to override auto-detection from `$SHELL`, `--dest <PATH>` to choose an explicit destination, `--force` to overwrite, `--print-path` to preview without writing, and `--no-hint` to suppress the per-shell setup banner. PowerShell and Elvish are not auto-installed; the command prints the manual instructions instead.
 `btr manpage` should print the command manpage to stdout.
 `install.sh` should be able to write generated completions and the manpage into user-supplied directories.
 

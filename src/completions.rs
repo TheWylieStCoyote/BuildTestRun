@@ -1,8 +1,75 @@
 use crate::{Cli, cli, constants};
 use clap::CommandFactory;
+use std::path::PathBuf;
 
 pub const DYNAMIC_SENTINEL_START: &str = "# >>> btr dynamic completion >>>";
 pub const DYNAMIC_SENTINEL_END: &str = "# <<< btr dynamic completion <<<";
+
+pub fn shell_label(shell: cli::CompletionShell) -> &'static str {
+    match shell {
+        cli::CompletionShell::Bash => "bash",
+        cli::CompletionShell::Zsh => "zsh",
+        cli::CompletionShell::Fish => "fish",
+        cli::CompletionShell::PowerShell => "power-shell",
+        cli::CompletionShell::Elvish => "elvish",
+    }
+}
+
+pub fn detect_shell_from_env<F>(get: F) -> Option<cli::CompletionShell>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let raw = get_nonempty(&get, "SHELL")?;
+    let leaf = std::path::Path::new(&raw).file_name()?.to_str()?;
+    match leaf {
+        "bash" => Some(cli::CompletionShell::Bash),
+        "zsh" => Some(cli::CompletionShell::Zsh),
+        "fish" => Some(cli::CompletionShell::Fish),
+        _ => None,
+    }
+}
+
+pub fn default_install_path<F>(shell: cli::CompletionShell, get: F) -> Option<PathBuf>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let home = PathBuf::from(get_nonempty(&get, "HOME")?);
+    let base = match shell {
+        cli::CompletionShell::Bash => {
+            let data_home = get_nonempty(&get, "XDG_DATA_HOME")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| home.join(".local/share"));
+            data_home
+                .join("bash-completion")
+                .join("completions")
+                .join("btr")
+        }
+        cli::CompletionShell::Zsh => {
+            let zdotdir = get_nonempty(&get, "ZDOTDIR")
+                .map(PathBuf::from)
+                .unwrap_or(home);
+            zdotdir.join(".zsh").join("completions").join("_btr")
+        }
+        cli::CompletionShell::Fish => {
+            let config_home = get_nonempty(&get, "XDG_CONFIG_HOME")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| home.join(".config"));
+            config_home
+                .join("fish")
+                .join("completions")
+                .join("btr.fish")
+        }
+        cli::CompletionShell::PowerShell | cli::CompletionShell::Elvish => return None,
+    };
+    Some(base)
+}
+
+fn get_nonempty<F>(get: &F, key: &str) -> Option<String>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    get(key).filter(|value| !value.is_empty())
+}
 
 pub fn render(shell: cli::CompletionShell) -> String {
     let mut buffer: Vec<u8> = Vec::new();

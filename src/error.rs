@@ -66,4 +66,7 @@ pub enum Error {
 
     #[error("failed to package project: {0}")]
     Package(String),
+
+    #[error("{0}")]
+    InstallCompletions(String),
 }

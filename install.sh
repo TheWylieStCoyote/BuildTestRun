@@ -62,80 +62,19 @@ warn_path() {
     fi
 }
 
-detect_shell() {
-    case "${SHELL:-}" in
-        */bash) printf '%s' 'bash' ;;
-        */zsh)  printf '%s' 'zsh' ;;
-        */fish) printf '%s' 'fish' ;;
-        *)      return 1 ;;
-    esac
-}
-
 setup_completion() {
     shell=$1
 
-    if [ "$shell" = "auto" ]; then
-        if ! shell=$(detect_shell); then
-            printf '%s\n' "error: could not auto-detect shell from \$SHELL (\"${SHELL:-}\")" >&2
-            printf '%s\n' "       pass --setup-completion=bash|zsh|fish explicitly" >&2
-            return 1
-        fi
-        printf '%s\n' "detected shell: $shell"
+    set -- install-completions --force
+    if [ "$shell" != "auto" ]; then
+        set -- "$@" --shell "$shell"
     fi
 
-    case "$shell" in
-        bash)
-            target_dir=${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion/completions
-            target_file=$target_dir/btr
-            clap_shell=bash
-            ;;
-        zsh)
-            target_dir=${ZDOTDIR:-$HOME}/.zsh/completions
-            target_file=$target_dir/_btr
-            clap_shell=zsh
-            ;;
-        fish)
-            target_dir=${XDG_CONFIG_HOME:-$HOME/.config}/fish/completions
-            target_file=$target_dir/btr.fish
-            clap_shell=fish
-            ;;
-        powershell|pwsh|power-shell)
-            printf '%s\n' "PowerShell auto-setup is not supported (profile paths vary)." >&2
-            printf '%s\n' "  Run:  btr completions power-shell > \$PROFILE.CurrentUserAllHosts" >&2
-            return 1
-            ;;
-        elvish)
-            printf '%s\n' "Elvish auto-setup is not supported." >&2
-            printf '%s\n' "  Run:  btr completions elvish > ~/.config/elvish/lib/btr-completion.elv" >&2
-            printf '%s\n' "  Then in rc.elv add:  use btr-completion" >&2
-            return 1
-            ;;
-        *)
-            printf '%s\n' "error: unsupported shell \"$shell\"; supported: bash, zsh, fish" >&2
-            return 1
-            ;;
-    esac
-
-    mkdir -p "$target_dir"
-    cargo run --quiet --manifest-path "$crate_dir/Cargo.toml" -- completions "$clap_shell" > "$target_file"
-    printf '%s\n' "installed $shell completion: $target_file"
-
-    case "$shell" in
-        bash)
-            printf '%s\n' "  Ensure bash-completion is installed and sourced from ~/.bashrc:"
-            printf '%s\n' "    [ -r /usr/share/bash-completion/bash_completion ] && . /usr/share/bash-completion/bash_completion"
-            printf '%s\n' "  Then open a new bash session (or: exec bash)."
-            ;;
-        zsh)
-            printf '%s\n' "  Add to ~/.zshrc BEFORE compinit:"
-            printf '%s\n' "    fpath=($target_dir \$fpath)"
-            printf '%s\n' "    autoload -U compinit && compinit"
-            printf '%s\n' "  Then open a new zsh session (or: exec zsh)."
-            ;;
-        fish)
-            printf '%s\n' "  Fish will pick it up automatically in the next session."
-            ;;
-    esac
+    if command -v btr >/dev/null 2>&1; then
+        btr "$@"
+    else
+        cargo run --quiet --manifest-path "$crate_dir/Cargo.toml" -- "$@"
+    fi
 }
 
 while [ "$#" -gt 0 ]; do

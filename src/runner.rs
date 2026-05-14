@@ -47,7 +47,8 @@ pub fn execute(
         | Action::Show(_)
         | Action::Explain(_)
         | Action::Parallel(_)
-        | Action::Complete(_) => {
+        | Action::Complete(_)
+        | Action::InstallCompletions(_) => {
             unreachable!()
         }
     };

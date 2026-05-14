@@ -143,6 +143,7 @@ pub fn run_from_args() -> Result<i32, Error> {
             cli.profile.as_deref(),
         ),
         Action::Complete(args) => complete_action(args, &start_dir, cli.profile.as_deref()),
+        Action::InstallCompletions(args) => install_completions_action(args),
         action => {
             if cli.dry_run {
                 dry_run_action(
@@ -2160,6 +2161,105 @@ pub fn completions_action(shell: cli::CompletionShell) -> Result<i32, Error> {
     Ok(0)
 }
 
+pub fn install_completions_action(args: cli::InstallCompletionsArgs) -> Result<i32, Error> {
+    let env_getter = |key: &str| env::var(key).ok();
+
+    let shell = match args.shell {
+        Some(shell) => shell,
+        None => completions::detect_shell_from_env(env_getter).ok_or_else(|| {
+            Error::InstallCompletions(format!(
+                "could not auto-detect shell from $SHELL (\"{}\"); pass --shell <bash|zsh|fish>",
+                env::var("SHELL").unwrap_or_default()
+            ))
+        })?,
+    };
+
+    let dest = match args.dest {
+        Some(path) => path,
+        None => match completions::default_install_path(shell, env_getter) {
+            Some(path) => path,
+            None => {
+                let (label, manual) = match shell {
+                    cli::CompletionShell::PowerShell => (
+                        "PowerShell",
+                        "btr completions power-shell > $PROFILE.CurrentUserAllHosts",
+                    ),
+                    cli::CompletionShell::Elvish => (
+                        "Elvish",
+                        "btr completions elvish > ~/.config/elvish/lib/btr-completion.elv",
+                    ),
+                    _ => unreachable!("default_install_path returned None for {shell:?}"),
+                };
+                return Err(Error::InstallCompletions(format!(
+                    "{label} auto-install is not supported; run manually:\n  {manual}\nor pass --dest <PATH> to write somewhere explicit",
+                )));
+            }
+        },
+    };
+
+    if args.print_path {
+        println!("{}", dest.display());
+        return Ok(0);
+    }
+
+    if dest.exists() && !args.force {
+        return Err(Error::InstallCompletions(format!(
+            "{} already exists; pass --force to overwrite",
+            dest.display()
+        )));
+    }
+
+    if let Some(parent) = dest.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent).map_err(|source| {
+            Error::InstallCompletions(format!("failed to create {}: {source}", parent.display()))
+        })?;
+    }
+
+    fs::write(&dest, completions::render(shell)).map_err(|source| {
+        Error::InstallCompletions(format!("failed to write {}: {source}", dest.display()))
+    })?;
+
+    println!(
+        "installed {} completion: {}",
+        completions::shell_label(shell),
+        dest.display()
+    );
+
+    if !args.no_hint {
+        print_install_completion_hint(shell, dest.parent());
+    }
+
+    Ok(0)
+}
+
+fn print_install_completion_hint(shell: cli::CompletionShell, parent: Option<&Path>) {
+    match shell {
+        cli::CompletionShell::Bash => {
+            println!("  Ensure bash-completion is installed and sourced from ~/.bashrc:");
+            println!(
+                "    [ -r /usr/share/bash-completion/bash_completion ] \
+                 && . /usr/share/bash-completion/bash_completion"
+            );
+            println!("  Then open a new bash session (or: exec bash).");
+        }
+        cli::CompletionShell::Zsh => {
+            let dir = parent
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| "<dir>".to_string());
+            println!("  Add to ~/.zshrc BEFORE compinit:");
+            println!("    fpath=({dir} $fpath)");
+            println!("    autoload -U compinit && compinit");
+            println!("  Then open a new zsh session (or: exec zsh).");
+        }
+        cli::CompletionShell::Fish => {
+            println!("  Fish will pick it up automatically in the next session.");
+        }
+        cli::CompletionShell::PowerShell | cli::CompletionShell::Elvish => {}
+    }
+}
+
 pub fn complete_action(
     args: cli::CompleteArgs,
     fallback_start: &Path,
@@ -3364,7 +3464,8 @@ fn action_command(action: &Action) -> (String, Vec<String>) {
         | Action::Doctor(_)
         | Action::Show(_)
         | Action::Explain(_)
-        | Action::Complete(_) => {
+        | Action::Complete(_)
+        | Action::InstallCompletions(_) => {
             unreachable!()
         }
     }

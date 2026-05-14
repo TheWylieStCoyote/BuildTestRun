@@ -3040,3 +3040,193 @@ fn which_program(name: &str) -> Option<std::path::PathBuf> {
     }
     None
 }
+
+fn install_completions_cmd(home: &Path) -> Command {
+    let mut cmd = Command::cargo_bin("btr").expect("binary");
+    cmd.env_clear()
+        .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+        .env("HOME", home);
+    cmd
+}
+
+#[test]
+fn install_completions_writes_bash_to_xdg_default() {
+    let temp = TempDir::new().expect("temp dir");
+
+    install_completions_cmd(temp.path())
+        .args(["install-completions", "--shell", "bash"])
+        .assert()
+        .success();
+
+    let target = temp
+        .path()
+        .join(".local/share/bash-completion/completions/btr");
+    let body = fs::read_to_string(&target).expect("read written file");
+    assert!(body.contains("_btr_dynamic"));
+}
+
+#[test]
+fn install_completions_respects_xdg_data_home() {
+    let temp = TempDir::new().expect("temp dir");
+    let xdg = temp.path().join("xdg-data");
+
+    install_completions_cmd(temp.path())
+        .env("XDG_DATA_HOME", &xdg)
+        .args(["install-completions", "--shell", "bash"])
+        .assert()
+        .success();
+
+    let target = xdg.join("bash-completion/completions/btr");
+    assert!(target.exists(), "expected file at {}", target.display());
+}
+
+#[test]
+fn install_completions_writes_zsh_underscore_btr() {
+    let temp = TempDir::new().expect("temp dir");
+
+    install_completions_cmd(temp.path())
+        .args(["install-completions", "--shell", "zsh"])
+        .assert()
+        .success();
+
+    let target = temp.path().join(".zsh/completions/_btr");
+    let body = fs::read_to_string(&target).expect("read written file");
+    assert!(body.contains("compdef _btr_dynamic btr"));
+}
+
+#[test]
+fn install_completions_zsh_respects_zdotdir() {
+    let temp = TempDir::new().expect("temp dir");
+    let zdotdir = temp.path().join("zdot");
+
+    install_completions_cmd(temp.path())
+        .env("ZDOTDIR", &zdotdir)
+        .args(["install-completions", "--shell", "zsh"])
+        .assert()
+        .success();
+
+    assert!(zdotdir.join(".zsh/completions/_btr").exists());
+}
+
+#[test]
+fn install_completions_writes_fish() {
+    let temp = TempDir::new().expect("temp dir");
+
+    install_completions_cmd(temp.path())
+        .args(["install-completions", "--shell", "fish"])
+        .assert()
+        .success();
+
+    let target = temp.path().join(".config/fish/completions/btr.fish");
+    let body = fs::read_to_string(&target).expect("read written file");
+    assert!(body.contains("__fish_seen_subcommand_from exec"));
+}
+
+#[test]
+fn install_completions_auto_detects_from_shell_env() {
+    let temp = TempDir::new().expect("temp dir");
+
+    install_completions_cmd(temp.path())
+        .env("SHELL", "/usr/bin/zsh")
+        .arg("install-completions")
+        .assert()
+        .success();
+
+    assert!(temp.path().join(".zsh/completions/_btr").exists());
+}
+
+#[test]
+fn install_completions_unknown_shell_errors_with_hint() {
+    let temp = TempDir::new().expect("temp dir");
+
+    install_completions_cmd(temp.path())
+        .env("SHELL", "/usr/bin/dash")
+        .arg("install-completions")
+        .assert()
+        .failure()
+        .stderr(contains("could not auto-detect"))
+        .stderr(contains("--shell"));
+}
+
+#[test]
+fn install_completions_print_path_does_not_write() {
+    let temp = TempDir::new().expect("temp dir");
+
+    install_completions_cmd(temp.path())
+        .args(["install-completions", "--shell", "bash", "--print-path"])
+        .assert()
+        .success()
+        .stdout(contains(".local/share/bash-completion/completions/btr"));
+
+    assert!(
+        !temp
+            .path()
+            .join(".local/share/bash-completion/completions/btr")
+            .exists()
+    );
+}
+
+#[test]
+fn install_completions_refuses_to_overwrite_without_force() {
+    let temp = TempDir::new().expect("temp dir");
+
+    install_completions_cmd(temp.path())
+        .args(["install-completions", "--shell", "bash"])
+        .assert()
+        .success();
+
+    install_completions_cmd(temp.path())
+        .args(["install-completions", "--shell", "bash"])
+        .assert()
+        .failure()
+        .stderr(contains("already exists"))
+        .stderr(contains("--force"));
+
+    install_completions_cmd(temp.path())
+        .args(["install-completions", "--shell", "bash", "--force"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn install_completions_powershell_prints_manual_instructions() {
+    let temp = TempDir::new().expect("temp dir");
+
+    install_completions_cmd(temp.path())
+        .args(["install-completions", "--shell", "power-shell"])
+        .assert()
+        .failure()
+        .stderr(contains("$PROFILE"));
+}
+
+#[test]
+fn install_completions_dest_override() {
+    let temp = TempDir::new().expect("temp dir");
+    let dest = temp.path().join("custom/path/btr-completion");
+
+    install_completions_cmd(temp.path())
+        .args(["install-completions", "--shell", "fish", "--dest"])
+        .arg(&dest)
+        .assert()
+        .success();
+
+    assert!(dest.exists());
+    let body = fs::read_to_string(&dest).expect("read written file");
+    assert!(body.contains("__fish_seen_subcommand_from exec"));
+}
+
+#[test]
+fn install_completions_no_hint_suppresses_setup_lines() {
+    let temp = TempDir::new().expect("temp dir");
+
+    let output = install_completions_cmd(temp.path())
+        .args(["install-completions", "--shell", "bash", "--no-hint"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = String::from_utf8(output).expect("utf-8");
+    assert!(stdout.contains("installed bash completion"));
+    assert!(!stdout.contains("bash-completion is installed"));
+}
